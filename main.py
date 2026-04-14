@@ -5,6 +5,7 @@ from config import load_config
 from src.database import Database
 from src.mail_client import MailClient
 from src.classifier import JobClassifier
+from src.k_drive_tools import KDriveTools
 
 
 class EmailAgent:
@@ -12,9 +13,11 @@ class EmailAgent:
         self.config = load_config()
         self.db = Database(self.config)
         self.db.connect()
+        self.db.drop_tables()
         self.db.ensure_tables()
         self.mail_client = MailClient(self.config)
         self.classifier = JobClassifier(self.config)
+        self.kdrive_tools = KDriveTools(self.config)
         self.running = False
 
     def start(self):
@@ -52,22 +55,20 @@ class EmailAgent:
 
     def _process_emails(self):
         print('Fetching recent emails via REST API...')
-        # La méthode utilise désormais le token et l'account_id en interne
         emails = self.mail_client.fetch_recent_emails(limit=50)
         print(f'Found {len(emails)} emails in inbox')
         
         new_job_applications = 0
         
         for email in emails:
-            # Sécurité : On vérifie l'ID dans la DB avant tout traitement lourd (Docling/LLM)
             if self.db.is_email_checked(email.email_id):
                 continue
             
             print(f'Checking email: {email.subject[:50]}...')
             
-            # Le classifier peut maintenant utiliser email.has_pdf_attachment 
-            # extrait directement du JSON de l'API
-            is_job = self.classifier.is_job_application(email)
+            is_job, attachment_index = self.classifier.is_job_application(email)
+
+            print(self.kdrive_tools.upload_file(email.attachments[attachment_index]['bytes'], f"{email.email_id}.pdf", self.config.kdrive_verified_directory_id))
             
             if is_job:
                 self.db.save_job_application(
@@ -81,29 +82,20 @@ class EmailAgent:
             else:
                 print(f'  -> Not a job application')
             
-            # Marquage de l'email comme traité pour éviter de le re-analyser
             self.db.mark_email_checked(email.email_id)
         
         if len(emails) > 0:
             print(f'Batch processed: {new_job_applications} new job(s) found.')
 
     def _cleanup(self):
-        # La déconnexion est symbolique sur l'API REST mais maintient la structure
         self.mail_client.disconnect()
         self.db.close()
         print('Cleanup complete. Goodbye!')
 
 
 def main():
-    mc = MailClient(load_config())
-    mc.connect()
-
-    emails = mc.fetch_recent_emails(limit=3)
-    
-    print(f'Found {len(emails)} emails')
-    print(emails)
-    # agent = EmailAgent()
-    # agent.start()
+    agent = EmailAgent()
+    agent.start()
 
 
 if __name__ == '__main__':

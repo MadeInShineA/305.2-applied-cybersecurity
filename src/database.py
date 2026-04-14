@@ -48,6 +48,15 @@ class Database:
 
             self._connection.commit()
 
+    def drop_tables(self) -> None:
+        if not self._connection:
+            self.connect()
+
+        with self._connection.cursor() as cursor:
+            cursor.execute('DROP TABLE IF EXISTS checked_emails')
+            cursor.execute('DROP TABLE IF EXISTS job_applications')
+            self._connection.commit()
+
     def is_email_checked(self, email_id: str) -> bool:
         if not self._connection:
             self.connect()

@@ -1,9 +1,26 @@
 import imaplib
 import email
+import datetime
 from email.policy import default
+from email.utils import parsedate_to_datetime
 from dataclasses import dataclass
 from typing import List, Optional
 import config
+import pdfplumber
+from io import BytesIO
+
+
+def parse_email_date(date_str: str) -> Optional[str]:
+    """Parse email date string to UTC datetime for MySQL."""
+    if not date_str:
+        return None
+    try:
+        dt = parsedate_to_datetime(date_str)
+        if dt.tzinfo is not None:
+            dt = dt.astimezone(datetime.timezone.utc)
+        return dt.strftime("%Y-%m-%d %H:%M:%S")
+    except Exception:
+        return None
 
 
 @dataclass
@@ -13,6 +30,7 @@ class Email:
     sender: str
     body: str
     has_pdf_attachment: bool
+    attachments: dict
     received_at: Optional[str] = None
 
 
@@ -75,6 +93,7 @@ class MailClient:
 
         return emails
 
+
     def _parse_raw_email(self, raw_email: bytes) -> Email:
         """
         Parses raw bytes into a structured Email object.
@@ -84,32 +103,57 @@ class MailClient:
         email_id = msg.get("Message-ID", "unknown")
         subject = msg.get("Subject", "No Subject")
         sender = msg.get("From", "Unknown Sender")
-        date = msg.get("Date", "")
+        date_str = msg.get("Date", "")
+        received_at = parse_email_date(date_str)
 
         body = ""
         has_pdf = False
+        attachments = []
 
-        # Parcours des parties MIME
+        # Iterate through MIME parts
         for part in msg.walk():
             content_type = part.get_content_type()
-            disposition = str(part.get_content_disposition())
+            disposition = part.get_content_disposition() or ""
 
-            # Extraction du corps (priorité au texte brut)
+            # Extract body (prefer plain text)
             if content_type == "text/plain" and "attachment" not in disposition:
-                if not body:  # On ne prend que la première partie texte
+                if not body:  # Only take the first text part
                     body = part.get_content()
 
-            # Détection de pièce jointe PDF
-            if "attachment" in disposition:
+            # Detect PDF attachment
+            if "attachment" in disposition.lower() or content_type.startswith("application/pdf"):
                 filename = part.get_filename()
                 if filename and filename.lower().endswith(".pdf"):
                     has_pdf = True
-
+                    # Extract raw bytes
+                    pdf_bytes = part.get_payload(decode=True)
+                    
+                    if pdf_bytes:
+                        try:
+                            with pdfplumber.open(BytesIO(pdf_bytes)) as pdf:
+                                # Extract text page by page, preserving layout
+                                pages_text = []
+                                for page in pdf.pages:
+                                    # extract_text() respects columns & reading order
+                                    page_text = page.extract_text() or ""
+                                    pages_text.append(page_text)
+                                
+                                full_text = "\n\n".join(pages_text)
+                                
+                                attachments.append({
+                                    "filename": filename,
+                                    "bytes": pdf_bytes,
+                                    "data": full_text,
+                                    "metadata": pdf.metadata
+                                })
+                        except Exception as e:
+                            has_pdf = False
         return Email(
             email_id=email_id,
             subject=subject,
             sender=sender,
-            body=body[:5000],  # Tronqué pour éviter de saturer le classifier
+            body=body[:5000],
             has_pdf_attachment=has_pdf,
-            received_at=date,
+            attachments=attachments,
+            received_at=received_at,
         )

@@ -7,6 +7,10 @@ from dotenv import load_dotenv
 class Config:
     openrouter_api_key: str
     infomaniak_api_key: str
+    kdrive_id: str
+    kdrive_verified_directory_id: str
+    kdrive_not_verified_directory_id: str
+    kdrive_job_offers_directory_id: str
     db_host: str
     db_user: str
     db_password: str
@@ -22,14 +26,22 @@ def load_config() -> Config:
     load_dotenv()
     return Config(
         openrouter_api_key=os.getenv("OPENROUTER_API_KEY", ""),
+
         infomaniak_api_key=os.getenv("INFOMANIAK_API_KEY", ""),
+        kdrive_id = os.getenv("KDRIVE_ID"),
+        kdrive_verified_directory_id = os.getenv("KDRIVE_VERIFIED_CV_DIRECTORY_ID"),
+        kdrive_not_verified_directory_id = os.getenv("KDRIVE_NOT_VERIFIED_CV_DIRECTORY_ID"),
+        kdrive_job_offers_directory_id = os.getenv("KDRIVE_JOB_OFFERS_DIRECTORY_ID"),
+
         db_host=os.getenv("DB_HOST", "localhost"),
         db_user=os.getenv("DB_USER", "root"),
         db_password=os.getenv("DB_PASSWORD", ""),
         db_name=os.getenv("DB_NAME", "email_agent"),
+
         mail_imap_host=os.getenv("MAIL_IMAP_HOST", "imap.kolabnow.com"),
         mail_imap_port=int(os.getenv("MAIL_IMAP_PORT", "993")),
         mail_email=os.getenv("MAIL_EMAIL", ""),
         mail_password=os.getenv("MAIL_PASSWORD", ""),
+
         poll_interval_seconds=int(os.getenv("POLL_INTERVAL_SECONDS", "300")),
     )
