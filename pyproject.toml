@@ -3,8 +3,9 @@ name = "305-2-applied-cybersecurity"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
-requires-python = ">=3.13"
+requires-python = "==3.12.*"
 dependencies = [
+    "docling>=2.88.0",
     "dotenv>=0.9.9",
     "langchain>=1.2.15",
     "langchain-openrouter>=0.2.1",

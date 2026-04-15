@@ -5,7 +5,7 @@ from email.policy import default
 from email.utils import parsedate_to_datetime
 from dataclasses import dataclass
 from typing import List, Optional
-import config
+from src.config import Config
 import pdfplumber
 from io import BytesIO
 
@@ -35,7 +35,9 @@ class Email:
 
 
 class MailClient:
-    def __init__(self, config: config.Config):
+    """Client for IMAP email operations with PDF attachment extraction."""
+
+    def __init__(self, config: Config):
         self.config = config
         self._connection: Optional[imaplib.IMAP4_SSL] = None
 
@@ -71,19 +73,16 @@ class MailClient:
         if not self._connection:
             self.connect()
 
-        # Recherche des IDs de tous les messages
         status, messages = self._connection.search(None, "ALL")
         if status != "OK":
             return []
 
-        # Récupération des derniers IDs (triés par limit)
         msg_ids = messages[0].split()
         latest_ids = msg_ids[-limit:]
-        latest_ids.reverse()  # Du plus récent au plus ancien
+        latest_ids.reverse()
 
         emails = []
         for msg_id in latest_ids:
-            # Fetch du contenu brut (RFC822)
             res, data = self._connection.fetch(msg_id, "(RFC822)")
             if res != "OK":
                 continue
@@ -93,7 +92,6 @@ class MailClient:
 
         return emails
 
-
     def _parse_raw_email(self, raw_email: bytes) -> Email:
         """
         Parses raw bytes into a structured Email object.
@@ -101,6 +99,7 @@ class MailClient:
         msg = email.message_from_bytes(raw_email, policy=default)
 
         email_id = msg.get("Message-ID", "unknown")
+
         subject = msg.get("Subject", "No Subject")
         sender = msg.get("From", "Unknown Sender")
         date_str = msg.get("Date", "")
@@ -121,13 +120,15 @@ class MailClient:
                     body = part.get_content()
 
             # Detect PDF attachment
-            if "attachment" in disposition.lower() or content_type.startswith("application/pdf"):
+            if "attachment" in disposition.lower() or content_type.startswith(
+                "application/pdf"
+            ):
                 filename = part.get_filename()
                 if filename and filename.lower().endswith(".pdf"):
                     has_pdf = True
                     # Extract raw bytes
                     pdf_bytes = part.get_payload(decode=True)
-                    
+
                     if pdf_bytes:
                         try:
                             with pdfplumber.open(BytesIO(pdf_bytes)) as pdf:
@@ -137,15 +138,17 @@ class MailClient:
                                     # extract_text() respects columns & reading order
                                     page_text = page.extract_text() or ""
                                     pages_text.append(page_text)
-                                
+
                                 full_text = "\n\n".join(pages_text)
-                                
-                                attachments.append({
-                                    "filename": filename,
-                                    "bytes": pdf_bytes,
-                                    "data": full_text,
-                                    "metadata": pdf.metadata
-                                })
+
+                                attachments.append(
+                                    {
+                                        "filename": filename,
+                                        "bytes": pdf_bytes,
+                                        "data": full_text,
+                                        "metadata": pdf.metadata,
+                                    }
+                                )
                         except Exception as e:
                             has_pdf = False
         return Email(
