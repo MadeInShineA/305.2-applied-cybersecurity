@@ -9,15 +9,20 @@ from langchain.agents import create_agent
 from langchain_community.tools import DuckDuckGoSearchResults
 from langchain_openrouter import ChatOpenRouter
 
-# Resolve project root
-project_root = Path(__file__).parent.parent
-if str(project_root) not in sys.path:
-    sys.path.insert(0, str(project_root))
+
+if __name__ == "__main__":
+    import sys
+    from pathlib import Path
+
+    project_root = Path(__file__).parent.parent
+
+    if str(project_root) not in sys.path:
+        sys.path.insert(0, str(project_root))
 
 from src.config import Config
 
 
-class CvVerifier:
+class CvVeracityChecker:
     def __init__(self, config: Config):
         self.config = config
 
@@ -187,9 +192,9 @@ if __name__ == "__main__":
         from src.config import load_config
 
     config = load_config()
-    cv_verifier = CvVerifier(config)
+    cv_verifier = CvVeracityChecker(config)
 
-    cv_json_path = project_root / "assets" / "cv_2.json"
+    cv_json_path = project_root / "assets" / "cv.json"
     if not cv_json_path.exists():
         raise FileNotFoundError(
             f"CV JSON not found at: {cv_json_path}. Please run extraction first."
@@ -198,7 +203,7 @@ if __name__ == "__main__":
     with open(cv_json_path, "r", encoding="utf-8") as f:
         cv_json = json.load(f)
 
-    debug_log_path = project_root / "assets" / "cv_2_veracity_check_logs.json"
+    debug_log_path = project_root / "assets" / "cv_veracity_check_logs.json"
 
     # Run verification with structured JSON logging
     score = cv_verifier.verify_cv(cv_json, debug=True, log_path=debug_log_path)

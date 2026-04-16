@@ -6,7 +6,8 @@ from src.mail_client import MailClient
 from src.email_classifier import EmailClassifier
 from src.cv_extractor import CvExtractor
 from src.k_drive_tools import KDriveTools
-from application_matcher import ApplicationMatcher
+from src.cv_veracity_checker import CvVeracityChecker
+from src.application_matcher import ApplicationMatcher
 
 
 class Orchestrator:
@@ -20,6 +21,7 @@ class Orchestrator:
         self.classifier = EmailClassifier(self.config)
         self.cv_extractor = CvExtractor(self.config)
         self.kdrive_tools = KDriveTools(self.config)
+        self.cv_veracity_checker = CvVeracityChecker(self.config)
         self.matcher = ApplicationMatcher(self.config, self.kdrive_tools)
 
         self.running = False
@@ -82,21 +84,45 @@ class Orchestrator:
                     self.config.kdrive_verified_directory_id
                 )
                 """
+
+                print("  -> Job application detected!")
+
                 extracted_cv = self.cv_extractor.extract_cv_to_json(
                     email.attachments[attachment_index]["bytes"]
                 )
 
-                matched_jobs = self.matcher.compare_with_offers(extracted_cv)
+                # save extracted CV for debugging
+                with open("extracted_cv.json", "w", encoding="utf-8") as f:
+                    import json
 
-                self.db.save_job_application(
-                    email_id=email.email_id,
-                    sender_email=email.sender,
-                    subject=email.subject,
-                )
-                new_job_applications += 1
-                print(f"  -> Job application detected!")
+                    json.dump(extracted_cv, f, indent=4, ensure_ascii=False)
+
+                try:
+                    personne_nom = extracted_cv["personne"]["nom"]
+                    file_name = personne_nom.lower().replace("", "-")
+                except:
+                    RuntimeError("The personne.nom field doesn't exist")
+
+                is_cv_verified = self.cv_veracity_checker.verify_cv(extracted_cv) > 50
+
+                if is_cv_verified:
+                    self.kdrive_tools.upload_file(
+                        email.attachments[attachment_index]["bytes"],
+                        file_name,
+                        self.config.kdrive_verified_directory_id,
+                    )
+
+                    matched_jobs = self.matcher.compare_with_offers(extracted_cv)
+
+                    new_job_applications += 1
+                else:
+                    self.kdrive_tools.upload_file(
+                        email.attachments[attachment_index]["bytes"],
+                        file_name,
+                        self.config.kdrive_not_verified_directory_id,
+                    )
             else:
-                print(f"  -> Not a job application")
+                print("  -> Not a job application")
 
             self.db.create_email_entry(email.email_id, email.received_at)
 

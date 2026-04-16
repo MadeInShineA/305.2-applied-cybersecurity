@@ -75,12 +75,12 @@ if __name__ == "__main__":
     config = load_config()
     cv_extractor = CvExtractor(config)
 
-    cv_path = Path(__file__).parent.parent / "assets" / "cv_2.pdf"
+    cv_path = Path(__file__).parent.parent / "assets" / "cv.pdf"
     cv_bytes = cv_path.read_bytes()
 
     cv_json = cv_extractor.extract_cv_to_json(cv_bytes)
 
-    output_json_path = Path(__file__).parent.parent / "assets" / "cv_2.json"
+    output_json_path = Path(__file__).parent.parent / "assets" / "cv.json"
 
     with open(output_json_path, "w", encoding="utf-8") as f:
         json.dump(cv_json, f, indent=4, ensure_ascii=False)

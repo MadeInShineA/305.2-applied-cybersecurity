@@ -11,15 +11,22 @@ class Database:
         self._connection: Optional[pymysql.Connection] = None
 
     def connect(self) -> None:
-        """Establish connection to the MySQL database."""
+        """Establish connection to the MySQL database, creating it if it doesn't exist."""
         self._connection = pymysql.connect(
             host=self.config.db_host,
             user=self.config.db_user,
             password=self.config.db_password,
-            database=self.config.db_name,
             charset="utf8mb4",
             cursorclass=pymysql.cursors.DictCursor,
         )
+
+        with self._connection.cursor() as cursor:
+            cursor.execute(
+                f"CREATE DATABASE IF NOT EXISTS `{self.config.db_name}` "
+                "CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+            )
+
+        self._connection.select_db(self.config.db_name)
 
     def close(self) -> None:
         """Close the database connection."""
