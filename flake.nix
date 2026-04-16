@@ -22,6 +22,8 @@
             uv
             python312
             ruff
+
+            nushell
           ];
 
           env.LD_LIBRARY_PATH =
