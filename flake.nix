@@ -24,6 +24,8 @@
             ruff
 
             nushell
+            typst
+            tinymist
           ];
 
           env.LD_LIBRARY_PATH =

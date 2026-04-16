@@ -91,7 +91,7 @@ class EmailAnswerGenerator:
         """
         self.config = config
         self.llm = ChatOpenRouter(
-            model=self.config.openrouter_model, temperature=0.3, max_tokens=4096
+            model=self.config.openrouter_model, temperature=0.0, max_tokens=4096
         )
 
     def generate_email_answer(
@@ -133,7 +133,7 @@ class EmailAnswerGenerator:
         Note:
             - The method attempts to extract the sender address from multiple
               possible fields (sender, from_address, email).
-            - Temperature is set to 0.3 to allow some creativity while maintaining
+            - Temperature is set to 0.0 to maintain determinism
               professionalism.
             - The LLM returns JSON which is parsed to extract subject and body.
         """
@@ -154,13 +154,17 @@ class EmailAnswerGenerator:
                 (
                     "system",
                     (
-                        "You are an expert recruitment assistant. Draft a professional email response to a job applicant. "
+                        "You are an expert recruitment assistant. Draft a professional email response to a spontaneous job applicant. "
                         "Use the provided original email, candidat name and match evaluation report to craft your reply. "
+                        "If the matching score is above 50, try to fix an appointment"
+                        "Be very profesional and respectful, don't discriminate in anyway"
                         "Return ONLY a valid JSON object with exactly these two keys: 'subject' and 'body'. "
                         "- 'subject': A clear, professional subject line regarding their application. "
                         "- 'body': The full email text. Acknowledge the application, professionally reference the match "
                         "evaluation (strengths and gaps), and clearly communicate the recommendation or next steps. "
                         "Maintain a courteous, professional tone. Reply in the same language as the original email. based on the body and the match report"
+                        "For the signature ,use this information: "
+                        "Nom du rectureur: Lara Clète, poste: Cheffe RH, entreprise: TechCorp, coordonnées: lara.clete@ctrobon.ch, +41 79 123 45 67."
                         "Do not include markdown formatting, code blocks, or any text outside the JSON."
                     ),
                 ),

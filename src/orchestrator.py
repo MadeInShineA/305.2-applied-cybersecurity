@@ -238,9 +238,9 @@ class Orchestrator:
         new_job_applications = 0
 
         # Display separator for batch processing
-        print("-" * 50)
+        print("=" * 50)
         print(f"Processing batch of {len(emails)} emails...")
-        print("-" * 50)
+        print("=" * 50)
 
         # Process each email in the batch
         for email in emails:
@@ -289,7 +289,7 @@ class Orchestrator:
                 print(f"The cv got a verification score of: {cv_verification_score}")
 
                 # Determine if CV is verified based on score threshold
-                is_cv_verified = cv_verification_score > 50
+                is_cv_verified = cv_verification_score >= 50
 
                 # Handle verified CVs
                 if is_cv_verified:
@@ -329,9 +329,6 @@ class Orchestrator:
                             email, candidate_name, best_match_offer
                         )
                     )
-
-                    # Log the generated email
-                    print(email_answer)
 
                     print("Email answer generated")
 

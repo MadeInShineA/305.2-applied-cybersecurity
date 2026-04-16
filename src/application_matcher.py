@@ -3,18 +3,22 @@ Application matcher module for the email agent application.
 
 This module provides the ApplicationMatcher class which compares candidate CVs
 against available job offers to find the best match. It uses an LLM to evaluate
-the relevance between CV data and job descriptions, producing a match score
-along with strengths, weaknesses, and recommendations.
+the relevance between CV data and job descriptions (extracted from PDFs), producing
+a match score along with strengths, weaknesses, and recommendations.
 
 The matching process:
-1. Fetch all job offers from kDrive
-2. Compare each CV against each job offer using LLM
-3. Return the best matching job offer with evaluation details
+1. Fetch all job offer PDFs from kDrive
+2. Extract text from each PDF using pdfplumber
+3. Compare each CV against each job offer using LLM
+4. Return the best matching job offer with evaluation details
 """
 
+import io
 import json
-from typing import Dict, Any, List, Tuple, Optional
+import re
+from typing import Dict, Any, List, Tuple
 
+import pdfplumber
 from langchain_openrouter import ChatOpenRouter
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_core.output_parsers import JsonOutputParser
@@ -28,8 +32,8 @@ class ApplicationMatcher:
     Matches candidate CVs against available job offers using LLM evaluation.
 
     This class provides functionality to compare a candidate's CV (in JSON format)
-    against all available job offers stored in kDrive. It uses an LLM to perform
-    detailed evaluation of the match, providing:
+    against all available job offers stored in kDrive as PDF files. It uses an LLM
+    to perform detailed evaluation of the match, providing:
     - A match score (0-100)
     - Candidate strengths relative to the job
     - Candidate weaknesses or gaps
@@ -66,23 +70,29 @@ class ApplicationMatcher:
 
     def get_job_offers(self) -> List[Dict[str, Any]]:
         """
-        Fetch and decode all job offer files from kDrive.
+        Fetch and extract text from all job offer PDFs from kDrive.
 
-        This method retrieves all files from the configured job offers
-        directory in kDrive. It reads each file's content and returns
-        a list of job offer objects containing the name, ID, and content.
+        This method retrieves all PDF files from the configured job offers
+        directory in kDrive. It extracts the text content from each PDF using
+        pdfplumber and returns a list of job offer objects containing the name,
+        ID, and extracted text content.
+
+        The method:
+        - Filters for PDF files only (ignores directories and non-PDF files)
+        - Extracts text from all pages, concatenating with double newlines
+        - Only includes offers where text was successfully extracted
+        - Handles extraction errors gracefully, printing warnings and skipping failed files
 
         Returns:
             List[Dict[str, Any]]: A list of job offer dictionaries, each containing:
-                - name: The filename of the job offer
+                - name: The filename of the job offer PDF
                 - id: The kDrive file ID
-                - content: The text content of the job offer
+                - content: The extracted text content from the PDF
 
         Note:
-            - Only files (not directories) are included in the results.
-            - File content is decoded as UTF-8, with errors ignored for
-              corrupted files.
-            - Empty files or files that fail to load are skipped.
+            - Only PDF files are processed (filtered by .pdf extension)
+            - Empty PDFs or those that fail extraction are skipped
+            - Text is extracted page-by-page and concatenated
         """
         # Get the kDrive directory ID for job offers from configuration
         directory_id = self.config.kdrive_job_offers_directory_id
@@ -92,24 +102,41 @@ class ApplicationMatcher:
         # Process each file to extract job offer content
         job_offers = []
         for file in files:
-            # Only process actual files (not subdirectories)
-            if file.get("type") == "file":
+            # Filter for PDF files to avoid unnecessary processing
+            if file.get("type") == "file" and file.get("name", "").lower().endswith(
+                ".pdf"
+            ):
                 file_id = file.get("id")
                 # Extract file content from kDrive
                 content_chunks = self.kdrive_tools.extract_file_content(file_id)
                 if content_chunks:
-                    # Decode bytes to string, ignoring potential encoding errors
-                    content_str = b"".join(content_chunks).decode(
-                        "utf-8", errors="ignore"
-                    )
-                    # Add the job offer to our list
-                    job_offers.append(
-                        {
-                            "name": file.get("name"),
-                            "id": file_id,
-                            "content": content_str,
-                        }
-                    )
+                    # Combine byte chunks into a single PDF
+                    pdf_bytes = b"".join(content_chunks)
+                    try:
+                        # Open PDF and extract text from all pages
+                        with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
+                            # Extract and concatenate text from all non-empty pages
+                            extracted_text = "\n\n".join(
+                                page.extract_text()
+                                for page in pdf.pages
+                                if page.extract_text()
+                            )
+
+                        # Only add offers with meaningful extracted text
+                        if extracted_text.strip():
+                            job_offers.append(
+                                {
+                                    "name": file.get("name"),
+                                    "id": file_id,
+                                    "content": extracted_text,
+                                }
+                            )
+                    except Exception as e:
+                        # In production, replace with proper logging: logger.warning(...)
+                        print(
+                            f"Warning: Failed to extract text from PDF {file.get('name')}: {e}"
+                        )
+                        continue
         return job_offers
 
     def compare_with_offers(
@@ -141,7 +168,7 @@ class ApplicationMatcher:
             - The comparison is case-sensitive for content matching but the LLM
               handles semantic evaluation.
         """
-        # Fetch all available job offers from kDrive
+        # Fetch all available job offers from kDrive (as PDF text)
         job_offers = self.get_job_offers()
 
         # Handle case with no job offers
@@ -176,14 +203,17 @@ class ApplicationMatcher:
         """
         Invoke the LLM to score the relevance between a CV and a job description.
 
-        This internal method sends the CV and job description to the LLM
-        with a detailed prompt requesting evaluation in a specific JSON format.
-        The LLM analyzes the match and provides a score along with strengths,
+        This internal method sends the CV and job description (extracted from PDF)
+        to the LLM with a detailed prompt requesting evaluation in a specific JSON
+        format. The LLM analyzes the match and provides a score along with strengths,
         weaknesses, and a recommendation.
+
+        The method uses regex parsing instead of JsonOutputParser to handle cases
+        where the LLM might include reasoning text before the JSON output.
 
         Args:
             cv_json: The candidate's CV data as a dictionary.
-            offer: The job offer dictionary containing name, id, and content.
+            offer: The job offer dictionary containing name, id, and extracted content.
 
         Returns:
             Tuple[int, Dict[str, Any]]: A tuple containing:
@@ -191,53 +221,54 @@ class ApplicationMatcher:
                 - report: Dictionary with evaluation details
 
         Note:
-            - The LLM is instructed to return only valid JSON.
-            - If parsing fails or the LLM returns invalid JSON, a fallback
-              error report is returned with score 0.
-            - The output parser ensures clean JSON output from the LLM.
+            - The LLM is instructed to return only valid JSON without explanations
+            - Regex extraction is used to handle potential reasoning text in output
+            - If parsing fails, a RuntimeError is raised
         """
         # Prepare CV and job description for the prompt
         cv_data_str = json.dumps(cv_json, indent=2)
+        # Get extracted text from the job offer PDF
         job_description = offer.get("content", "Empty job description")
 
-        # Construct the evaluation prompt with explicit JSON schema
+        # Strict prompt to prevent chain of thought reasoning in output
         prompt_text = (
-            "You are a job matching expert. Evaluate the candidate's CV against the job offer.\n\n"
-            f"CANDIDATE CV (JSON):\n{cv_data_str}\n\n"
+            "Evaluate candidate CV against job offer.\n\n"
+            f"CANDIDATE CV:\n{cv_data_str}\n\n"
             f"JOB OFFER:\n{job_description}\n\n"
-            "Provide your evaluation as a strict JSON object with this exact structure:\n"
+            "Return ONLY a valid JSON object. No explanation. No markdown formatting. No reasoning. Use exactly this structure:\n"
             "{\n"
-            '  "match_score": <integer 0-100>,\n'
-            '  "strengths": [<list of strings>],\n'
-            '  "weaknesses": [<list of strings>],\n'
-            '  "recommendation": "<string>"\n'
-            "}\n"
-            "Return only the JSON object."
+            '  "match_score": 0,\n'
+            '  "strengths": [""],\n'
+            '  "weaknesses": [""],\n'
+            '  "recommendation": ""\n'
+            "}"
         )
 
         try:
             # Prepare messages: SystemMessage for role, HumanMessage for task
             messages = [
                 SystemMessage(
-                    content="You are a strict recruitment AI that outputs only JSON."
+                    content="You are a strict data processor. Output ONLY raw JSON."
                 ),
                 HumanMessage(content=prompt_text),
             ]
 
-            # Build the chain: LLM -> output parser for automated JSON cleaning
-            chain = self.llm | self.output_parser
-            report_json = chain.invoke(messages)
+            # Invoke LLM without the strict output parser to handle raw text
+            response = self.llm.invoke(messages)
+            raw_output = response.content
+
+            # Extract JSON payload using regex to bypass any leaked reasoning
+            json_match = re.search(r"\{.*\}", raw_output, re.DOTALL)
+
+            if not json_match:
+                raise ValueError(f"No JSON object found in LLM output: {raw_output}")
+
+            # Parse the extracted JSON string
+            report_json = json.loads(json_match.group(0))
 
             # Extract and ensure the score is an integer
             score = int(report_json.get("match_score", 0))
             return score, report_json
 
         except Exception as e:
-            # Fallback in case of LLM failure or parsing error
-            error_report = {
-                "match_score": 0,
-                "strengths": [],
-                "weaknesses": [f"Processing error: {str(e)}"],
-                "recommendation": "Error during LLM evaluation.",
-            }
-            return 0, error_report
+            raise RuntimeError(f"Evaluation failed: {e}")
