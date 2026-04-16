@@ -26,7 +26,7 @@ def infomaniak-ai [
 
     # Return just content by default, or full response if raw
     if $raw {
-        $response
+        $response | to json --raw
     } else {
         $response.choices.0.message.content | str trim
     }
