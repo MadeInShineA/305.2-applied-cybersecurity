@@ -1,5 +1,3 @@
-from langchain_openrouter import ChatOpenRouter
-from langchain_core.messages import HumanMessage
 from src.mail_client import Email
 from src.config import Config
 import re

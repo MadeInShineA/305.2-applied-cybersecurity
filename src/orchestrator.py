@@ -1,12 +1,12 @@
 import time
 import signal
-import sys
 from src.config import load_config
 from src.database import Database
 from src.mail_client import MailClient
 from src.email_classifier import EmailClassifier
 from src.cv_extractor import CvExtractor
 from src.k_drive_tools import KDriveTools
+from application_matcher import ApplicationMatcher
 
 
 class Orchestrator:
@@ -20,6 +20,8 @@ class Orchestrator:
         self.classifier = EmailClassifier(self.config)
         self.cv_extractor = CvExtractor(self.config)
         self.kdrive_tools = KDriveTools(self.config)
+        self.matcher = ApplicationMatcher(self.config, self.kdrive_tools)
+
         self.running = False
 
     def start(self):
@@ -83,6 +85,8 @@ class Orchestrator:
                 extracted_cv = self.cv_extractor.extract_cv_to_json(
                     email.attachments[attachment_index]["bytes"]
                 )
+
+                matched_jobs = self.matcher.compare_with_offers(extracted_cv)
 
                 self.db.save_job_application(
                     email_id=email.email_id,

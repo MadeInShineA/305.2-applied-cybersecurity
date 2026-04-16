@@ -1,5 +1,5 @@
 import pymysql
-from typing import Optional, Set
+from typing import Optional
 from src.config import Config
 
 
