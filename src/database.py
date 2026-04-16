@@ -1,5 +1,7 @@
-import pymysql
 from typing import Optional
+
+import pymysql
+
 from src.config import Config
 
 
@@ -62,6 +64,23 @@ class Database:
                 )
             """)
 
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS job_offer_matches (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    email_id VARCHAR(255) NOT NULL,
+                    match_score INT,
+                    offer_name VARCHAR(500),
+                    offer_id VARCHAR(255),
+                    strengths TEXT,
+                    weaknesses TEXT,
+                    recommendation TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (email_id) REFERENCES emails(email_id)
+                        ON DELETE CASCADE
+                        ON UPDATE CASCADE
+                )
+            """)
+
             self._connection.commit()
 
     def drop_tables(self) -> None:
@@ -70,6 +89,7 @@ class Database:
             self.connect()
 
         with self._connection.cursor() as cursor:
+            cursor.execute("DROP TABLE IF EXISTS job_offer_matches")
             cursor.execute("DROP TABLE IF EXISTS job_applications")
             cursor.execute("DROP TABLE IF EXISTS emails")
             self._connection.commit()
@@ -109,8 +129,8 @@ class Database:
             with self._connection.cursor() as cursor:
                 cursor.execute(
                     """
-                    INSERT INTO job_applications 
-                    (email_id, sender_email, subject) 
+                    INSERT INTO job_applications
+                    (email_id, sender_email, subject)
                     VALUES (%s, %s, %s)
                     """,
                     (email_id, sender_email, subject),
@@ -119,5 +139,42 @@ class Database:
             return True
         except pymysql.err.IntegrityError:
             return False
+        except Exception:
+            raise
+
+    def save_job_offer_comparison(
+        self,
+        email_id: str,
+        match_score: int,
+        offer_name: str,
+        offer_id: str,
+        strengths: str,
+        weaknesses: str,
+        recommendation: str,
+    ) -> bool:
+        """Save a job offer comparison summary to the database."""
+        if not self._connection:
+            self.connect()
+
+        try:
+            with self._connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    INSERT INTO job_offer_matches
+                    (email_id, match_score, offer_name, offer_id, strengths, weaknesses, recommendation)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                    """,
+                    (
+                        email_id,
+                        match_score,
+                        offer_name,
+                        offer_id,
+                        strengths,
+                        weaknesses,
+                        recommendation,
+                    ),
+                )
+                self._connection.commit()
+            return True
         except Exception:
             raise

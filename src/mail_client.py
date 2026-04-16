@@ -219,7 +219,7 @@ if __name__ == "__main__":
     mail_client = MailClient(config)
 
     mail_client.send_email(
-        ["simon.masserey@hes-so.ch"],
+        ["loic.christen1@hes-so.ch"],
         "Es-tu daltonien ?",
         """
         <h1>Fait le test <a href="https://www.youtube.com/watch?v=ZzUsKizhb8o" target="_blank">ici</a></h1>

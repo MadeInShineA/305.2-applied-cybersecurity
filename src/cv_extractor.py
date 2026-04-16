@@ -4,6 +4,7 @@ from docling.document_converter import DocumentConverter, DocumentStream
 from langchain_core.output_parsers import JsonOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_openrouter import ChatOpenRouter
+import json
 
 if __name__ == "__main__":
     import sys
@@ -18,38 +19,49 @@ from src.config import Config
 
 
 class CvExtractor:
-    def __init__(self, config: Config):
+    def __init__(self, config: Config, converter: DocumentConverter):
         self.config = config
-
+        self.converter = converter
         self.llm = ChatOpenRouter(
-            model="nvidia/nemotron-3-nano-30b-a3b", temperature=0, max_tokens=4096
+            model=self.config.openrouter_model, temperature=0, max_tokens=4096
         )
 
     def extract_cv_to_json(self, cv_pdf_bytes: bytes) -> dict:
-        """
-        Extract CV data to JSON using Docling and ChatOpenRouter.
-        Uses a LangChain pipeline to ensure structured output.
-        """
-        converter = DocumentConverter()
         source = DocumentStream(name="cv.pdf", stream=BytesIO(cv_pdf_bytes))
-        result = converter.convert(source)
+        result = self.converter.convert(source)
         markdown_content = result.document.export_to_markdown()
 
-        # TODO: Use english instead of french?
+        json_schema = {
+            "person": {
+                "name": "Full Name",
+                "email": "email@example.com",
+                "phone": "phone number",
+            },
+            "education": [],
+            "work_experience": [],
+            "skills": [],
+            "languages": [],
+            "certifications": [],
+            "notable_projects": [],
+            "interests": [],
+        }
+
         prompt = ChatPromptTemplate.from_messages(
             [
                 (
                     "system",
                     (
-                        "You are an expert recruitment assistant. Analyze the provided CV (English or French) "
-                        "and extract information into a strict JSON format. "
-                        "Use these French keys: 'personne', 'formation', 'experience_professionnelle', "
-                        "'competences', 'langues', 'certifications', 'projets_notables', 'centres_interet'. "
-                        "If information is missing, use null. Translate English values to French. "
-                        "Return only the JSON object."
+                        "You are an expert recruitment assistant. Analyze the provided CV "
+                        "and extract information into this STRICT JSON format: \n"
+                        f"{json.dumps(json_schema).replace('{', '{{').replace('}', '}}')} \n"
+                        "Return ONLY the JSON object. Translate all values to English. "
+                        "If a field is missing, use null."
                     ),
                 ),
-                ("human", "{cv_content}"),
+                (
+                    "human",
+                    "{cv_content}",
+                ),
             ]
         )
 
@@ -57,10 +69,15 @@ class CvExtractor:
 
         try:
             json_output = chain.invoke({"cv_content": markdown_content})
+
+            if not isinstance(json_output, dict):
+                raise ValueError(f"Expected dict, got {type(json_output)}")
+
             return json_output
+
         except Exception as e:
             raise RuntimeError(
-                f"CRITICAL: Failed to process CV through OpenRouter: {e}"
+                f"CRITICAL: LLM output is not a valid JSON structure: {e}"
             )
 
 
@@ -73,7 +90,7 @@ if __name__ == "__main__":
     from src.cv_extractor import CvExtractor
 
     config = load_config()
-    cv_extractor = CvExtractor(config)
+    cv_extractor = CvExtractor(config, DocumentConverter())
 
     cv_path = Path(__file__).parent.parent / "assets" / "cv.pdf"
     cv_bytes = cv_path.read_bytes()

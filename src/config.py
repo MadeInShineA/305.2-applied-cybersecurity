@@ -9,6 +9,7 @@ class Config:
     """Configuration dataclass containing all API keys and settings."""
 
     openrouter_api_key: str
+    openrouter_model: str
     infomaniak_api_key: str
     kdrive_id: str
     kdrive_verified_directory_id: str
@@ -32,6 +33,9 @@ def load_config() -> Config:
     load_dotenv()
     return Config(
         openrouter_api_key=os.getenv("OPENROUTER_API_KEY", ""),
+        openrouter_model=os.getenv(
+            "OPENROUTER_MODEL", "nvidia/nemotron-3-nano-30b-a3b"
+        ),
         infomaniak_api_key=os.getenv("INFOMANIAK_API_KEY", ""),
         kdrive_id=os.getenv("KDRIVE_ID"),
         kdrive_verified_directory_id=os.getenv("KDRIVE_VERIFIED_CV_DIRECTORY_ID"),

@@ -26,7 +26,7 @@ class CvVeracityChecker:
         self.config = config
 
         self.llm = ChatOpenRouter(
-            model="nvidia/nemotron-3-nano-30b-a3b", temperature=0, max_tokens=4096
+            model=self.config.openrouter_model, temperature=0, max_tokens=4096
         )
 
         self.search_tool = DuckDuckGoSearchResults()
@@ -34,7 +34,6 @@ class CvVeracityChecker:
         self.system_prompt = """
             You are an expert HR background verification assistant.
             Your task is to verify the authenticity of a CV provided as JSON.
-            Extracted keys: 'personne', 'formation', 'experience_professionnelle', 'competences', 'langues', 'certifications', 'projets_notables', 'centres_interet'.
 
             VERIFICATION PROCESS:
             1. Identify key verifiable claims (companies, job titles, degrees, certifications, publications, major projects).

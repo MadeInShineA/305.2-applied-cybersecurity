@@ -1,5 +1,6 @@
 import signal
 import time
+from docling.document_converter import DocumentConverter
 
 from src.application_matcher import ApplicationMatcher
 from src.config import load_config
@@ -9,21 +10,24 @@ from src.database import Database
 from src.email_classifier import EmailClassifier
 from src.k_drive_tools import KDriveTools
 from src.mail_client import MailClient
+from src.email_answer_generator import EmailAnswerGenerator, EmailAnswer
 
 
 class Orchestrator:
     def __init__(self):
         self.config = load_config()
+        self.converter = DocumentConverter()
         self.db = Database(self.config)
         self.db.connect()
         self.db.drop_tables()
         self.db.ensure_tables()
         self.mail_client = MailClient(self.config)
         self.classifier = EmailClassifier(self.config)
-        self.cv_extractor = CvExtractor(self.config)
+        self.cv_extractor = CvExtractor(self.config, self.converter)
         self.kdrive_tools = KDriveTools(self.config)
         self.cv_veracity_checker = CvVeracityChecker(self.config)
         self.matcher = ApplicationMatcher(self.config, self.kdrive_tools)
+        self.email_answer_generator = EmailAnswerGenerator(self.config)
 
         self.running = False
 
@@ -69,37 +73,41 @@ class Orchestrator:
 
         new_job_applications = 0
 
+        # display a separator in the logs for each batch of emails processed
+        print("-" * 50)
+        print(f"Processing batch of {len(emails)} emails...")
+        print("-" * 50)
+
         for email in emails:
             if self.db.email_exists(email.email_id):
                 continue
+
+            self.db.create_email_entry(email.email_id, email.received_at)
 
             print(f"Checking email: {email.subject[:50]}...")
 
             is_job, attachment_index = self.classifier.is_job_application(email)
 
             if is_job:
-                """
-                self.kdrive_tools.upload_file(
-                    email.attachments[attachment_index]['bytes'],
-                    f"{email.email_id}.pdf",
-                    self.config.kdrive_verified_directory_id
-                )
-                """
-
                 print("Job application detected!")
 
                 extracted_cv = self.cv_extractor.extract_cv_to_json(
                     email.attachments[attachment_index]["bytes"]
                 )
 
-                print("Cv information extracted")
+                person_data = extracted_cv.get("person", {})
+                candidate_name = person_data.get("name", "unknown")
 
-                file_name = None
-                try:
-                    personne_nom = extracted_cv["personne"]["nom"]
-                    file_name = personne_nom.lower().replace(" ", "-")
-                except:
-                    RuntimeError("The personne.nom field doesn't exist")
+                file_name = (
+                    candidate_name.lower().replace(" ", "-")
+                    if candidate_name
+                    else f"cv-{email.sender}"
+                )
+
+                if not file_name:
+                    file_name = f"cv-{email.sender}"
+
+                print(f"Extracted cv for: {file_name if file_name else 'unknown'}")
 
                 cv_verification_score = self.cv_veracity_checker.verify_cv(extracted_cv)
 
@@ -118,7 +126,40 @@ class Orchestrator:
 
                     print("Cv file saved on Kdrive")
 
-                    matched_jobs = self.matcher.compare_with_offers(extracted_cv)
+                    match_score, best_match_offer, best_report = (
+                        self.matcher.compare_with_offers(extracted_cv)
+                    )
+
+                    # print match score
+                    print(f"Best match score: {match_score}")
+
+                    self.db.save_job_offer_comparison(
+                        email_id=email.email_id,
+                        match_score=match_score,
+                        offer_name=best_match_offer.get("name", ""),
+                        offer_id=best_match_offer.get("id", ""),
+                        strengths=str(best_report.get("strengths", [])),
+                        weaknesses=str(best_report.get("weaknesses", [])),
+                        recommendation=best_report.get("recommendation", ""),
+                    )
+
+                    email_answer: EmailAnswer = (
+                        self.email_answer_generator.generate_email_answer(
+                            email, candidate_name, best_match_offer
+                        )
+                    )
+
+                    print(email_answer)
+
+                    print("Email answer generated")
+
+                    self.mail_client.send_email(
+                        email_answer.address,
+                        email_answer.subject,
+                        email_answer.body,
+                    )
+
+                    print("Email answer sent")
 
                     new_job_applications += 1
                 else:
@@ -134,7 +175,8 @@ class Orchestrator:
             else:
                 print("Not a job application")
 
-            self.db.create_email_entry(email.email_id, email.received_at)
+            # display a separator in the logs for each email processed
+            print("-" * 50)
 
         if len(emails) > 0:
             print(f"Batch processed: {new_job_applications} new job(s) found.")
