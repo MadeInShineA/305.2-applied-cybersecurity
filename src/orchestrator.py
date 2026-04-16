@@ -1,13 +1,14 @@
-import time
 import signal
-from src.config import load_config
-from src.database import Database
-from src.mail_client import MailClient
-from src.email_classifier import EmailClassifier
-from src.cv_extractor import CvExtractor
-from src.k_drive_tools import KDriveTools
-from src.cv_veracity_checker import CvVeracityChecker
+import time
+
 from src.application_matcher import ApplicationMatcher
+from src.config import load_config
+from src.cv_extractor import CvExtractor
+from src.cv_veracity_checker import CvVeracityChecker
+from src.database import Database
+from src.email_classifier import EmailClassifier
+from src.k_drive_tools import KDriveTools
+from src.mail_client import MailClient
 
 
 class Orchestrator:
@@ -85,44 +86,53 @@ class Orchestrator:
                 )
                 """
 
-                print("  -> Job application detected!")
+                print("Job application detected!")
 
                 extracted_cv = self.cv_extractor.extract_cv_to_json(
                     email.attachments[attachment_index]["bytes"]
                 )
 
-                # save extracted CV for debugging
-                with open("extracted_cv.json", "w", encoding="utf-8") as f:
-                    import json
+                print("Cv information extracted")
 
-                    json.dump(extracted_cv, f, indent=4, ensure_ascii=False)
-
+                file_name = None
                 try:
                     personne_nom = extracted_cv["personne"]["nom"]
-                    file_name = personne_nom.lower().replace("", "-")
+                    file_name = personne_nom.lower().replace(" ", "-")
                 except:
                     RuntimeError("The personne.nom field doesn't exist")
 
-                is_cv_verified = self.cv_veracity_checker.verify_cv(extracted_cv) > 50
+                cv_verification_score = self.cv_veracity_checker.verify_cv(extracted_cv)
+
+                print(f"The cv got a verification score of: {cv_verification_score}")
+
+                is_cv_verified = cv_verification_score > 50
 
                 if is_cv_verified:
+                    print("Cv classified as verified")
+
                     self.kdrive_tools.upload_file(
                         email.attachments[attachment_index]["bytes"],
                         file_name,
                         self.config.kdrive_verified_directory_id,
                     )
 
+                    print("Cv file saved on Kdrive")
+
                     matched_jobs = self.matcher.compare_with_offers(extracted_cv)
 
                     new_job_applications += 1
                 else:
+                    print("Cv classified as not verified")
+
                     self.kdrive_tools.upload_file(
                         email.attachments[attachment_index]["bytes"],
                         file_name,
                         self.config.kdrive_not_verified_directory_id,
                     )
+
+                    print("Cv file saved on Kdrive")
             else:
-                print("  -> Not a job application")
+                print("Not a job application")
 
             self.db.create_email_entry(email.email_id, email.received_at)
 
