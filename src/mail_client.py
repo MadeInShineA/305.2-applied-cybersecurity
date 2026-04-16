@@ -1,3 +1,17 @@
+"""
+Mail client module for the email agent application.
+
+This module provides the MailClient class which handles all email operations
+including IMAP for receiving emails and SMTP for sending emails. It also
+includes utilities for parsing email content and extracting PDF attachments.
+
+The module supports:
+- IMAP email retrieval with PDF attachment extraction
+- SMTP email sending with HTML support
+- Email date parsing for database storage
+- PDF text extraction using pdfplumber
+"""
+
 import datetime
 import email
 import imaplib
@@ -26,7 +40,24 @@ from src.config import Config
 
 
 def parse_email_date(date_str: str) -> Optional[str]:
-    """Parse email date string to UTC datetime for MySQL."""
+    """
+    Parse email date string to UTC datetime for MySQL storage.
+
+    This utility function converts the date string from email headers
+    (in RFC 2822 format) to a standardized string format suitable
+    for MySQL TIMESTAMP storage.
+
+    Args:
+        date_str: The date string from email headers (e.g., "Wed, 15 Apr 2026 10:30:00 +0200").
+
+    Returns:
+        Optional[str]: A formatted datetime string in "%Y-%m-%d %H:%M:%S" format,
+                      or None if parsing fails.
+
+    Example:
+        >>> parse_email_date("Wed, 15 Apr 2026 10:30:00 +0200")
+        '2026-04-15 08:30:00'
+    """
     if not date_str:
         return None
     try:
@@ -40,6 +71,23 @@ def parse_email_date(date_str: str) -> Optional[str]:
 
 @dataclass
 class Email:
+    """
+    Data class representing a parsed email message.
+
+    This class encapsulates all relevant information extracted from an email,
+    including metadata (ID, subject, sender), content (body), and attachments.
+    It is used throughout the application to pass email data between components.
+
+    Attributes:
+        email_id: Unique identifier (Message-ID header) for the email.
+        subject: The email subject line.
+        sender: The sender's email address (From header).
+        body: The email body content (plain text, truncated to 5000 chars).
+        has_pdf_attachment: Boolean indicating if the email contains PDF attachments.
+        attachments: List of attachment dictionaries with 'filename', 'bytes', 'data', and 'metadata'.
+        received_at: Optional timestamp of when the email was received.
+    """
+
     email_id: str
     subject: str
     sender: str
@@ -50,15 +98,52 @@ class Email:
 
 
 class MailClient:
-    """Client for IMAP email operations with PDF attachment extraction."""
+    """
+    Client for IMAP email operations with PDF attachment extraction.
 
-    def __init__(self, config: Config):
+    This class provides a unified interface for receiving emails via IMAP
+    and sending emails via SMTP. It handles connection management, email
+    parsing, and PDF attachment text extraction.
+
+    The class supports:
+    - Connecting to IMAP servers to fetch recent emails
+    - Parsing raw email content including MIME multipart messages
+    - Extracting text from PDF attachments
+    - Sending emails via SMTP with HTML support
+
+    Attributes:
+        config: Configuration object containing email server credentials.
+        _connection: Internal IMAP4_SSL connection object (None when disconnected).
+
+    Example:
+        >>> client = MailClient(config)
+        >>> client.connect()
+        >>> emails = client.fetch_recent_emails(limit=10)
+        >>> client.send_email(["recipient@example.com"], "Subject", "Body")
+        >>> client.disconnect()
+    """
+
+    def __init__(self, config: Config) -> None:
+        """
+        Initialize the MailClient with configuration.
+
+        Args:
+            config: Config object containing email server credentials and settings.
+        """
         self.config = config
         self._connection: Optional[imaplib.IMAP4_SSL] = None
 
     def connect(self) -> None:
         """
-        Connects to the IMAP server using mail_imap_host and mail_password.
+        Connect to the IMAP server using mail_imap_host and mail_password.
+
+        This method establishes an SSL connection to the IMAP server,
+        authenticates using the configured credentials, and selects
+        the INBOX folder for subsequent operations.
+
+        Raises:
+            Exception: If connection or authentication fails.
+            imaplib.IMAP4.error: If the IMAP server returns an error.
         """
         try:
             self._connection = imaplib.IMAP4_SSL(
@@ -71,7 +156,15 @@ class MailClient:
 
     def disconnect(self) -> None:
         """
-        Closes the IMAP connection safely.
+        Close the IMAP connection safely.
+
+        This method gracefully closes the IMAP connection by first
+        closing the selected mailbox and then logging out. Any exceptions
+        during cleanup are silently caught to prevent disruption.
+
+        Note:
+            The internal connection reference is set to None after
+            disconnection to prevent accidental reuse.
         """
         if self._connection:
             try:
@@ -89,7 +182,21 @@ class MailClient:
         is_html: bool = False,
     ) -> None:
         """
-        Sends an email via SMTP using mail_smtp_host and mail_smtp_port.
+        Send an email via SMTP using mail_smtp_host and mail_smtp_port.
+
+        This method constructs a MIME multipart message and sends it via
+        the configured SMTP server. It supports both plain text and HTML
+        email formats. The method handles both explicit TLS (port 587)
+        and implicit SSL (port 465) connections.
+
+        Args:
+            to_addresses: List of recipient email addresses.
+            subject: The email subject line.
+            body: The email body content (plain text or HTML).
+            is_html: If True, the body is treated as HTML; otherwise as plain text.
+
+        Raises:
+            Exception: If SMTP connection or sending fails.
         """
         msg = MIMEMultipart()
         msg["From"] = self.config.mail_email
@@ -117,7 +224,26 @@ class MailClient:
 
     def fetch_recent_emails(self, limit: int = 50) -> List[Email]:
         """
-        Fetches the most recent emails using IMAP commands.
+        Fetch the most recent emails using IMAP commands.
+
+        This method retrieves the most recent emails from the INBOX folder.
+        It fetches the email IDs in reverse chronological order and parses
+        each raw email into an Email object with extracted content and
+        PDF attachments.
+
+        The method automatically connects to the IMAP server if not already
+        connected. It fetches emails in batches to improve performance.
+
+        Args:
+            limit: Maximum number of recent emails to fetch (default: 50).
+
+        Returns:
+            List[Email]: A list of Email objects parsed from the raw email data.
+                         Returns an empty list if no emails are found or on error.
+
+        Note:
+            The method sorts emails by chronological order (oldest to newest)
+            but fetches the most recent ones first from the IMAP server.
         """
         if not self._connection:
             self.connect()
@@ -143,53 +269,80 @@ class MailClient:
 
     def _parse_raw_email(self, raw_email: bytes) -> Email:
         """
-        Parses raw bytes into a structured Email object.
+        Parse raw bytes into a structured Email object.
+
+        This internal method handles the complex task of parsing raw email
+        bytes according to RFC 822/2822 standards. It extracts the email
+        metadata (ID, subject, sender, date) and processes MIME multipart
+        messages to extract the body and PDF attachments.
+
+        The method walks through all MIME parts of the email message:
+        - text/plain parts are extracted as the email body (first occurrence only)
+        - text/html parts are ignored (plain text is preferred)
+        - application/pdf parts with attachment disposition are extracted as files
+
+        For PDF attachments, the method uses pdfplumber to extract text content
+        from each page, preserving the reading order and column layout.
+
+        Args:
+            raw_email: Raw bytes representing the complete email message.
+
+        Returns:
+            Email: A structured Email object with extracted content and attachments.
+
+        Note:
+            - Email body is truncated to 5000 characters to prevent memory issues.
+            - PDF extraction failures silently set has_pdf to False.
+            - The method uses email.policy.default for modern parsing behavior.
         """
         msg = email.message_from_bytes(raw_email, policy=default)
 
+        # Extract email headers (Message-ID, Subject, From, Date)
         email_id = msg.get("Message-ID", "unknown")
-
         subject = msg.get("Subject", "No Subject")
         sender = msg.get("From", "Unknown Sender")
         date_str = msg.get("Date", "")
         received_at = parse_email_date(date_str)
 
+        # Initialize variables for body and attachments
         body = ""
         has_pdf = False
         attachments = []
 
-        # Iterate through MIME parts
+        # Iterate through MIME parts to extract content and attachments
         for part in msg.walk():
             content_type = part.get_content_type()
             disposition = part.get_content_disposition() or ""
 
-            # Extract body (prefer plain text)
+            # Extract body (prefer plain text, skip attachments)
             if content_type == "text/plain" and "attachment" not in disposition:
                 if not body:  # Only take the first text part
                     body = part.get_content()
 
-            # Detect PDF attachment
+            # Detect and extract PDF attachments
             if "attachment" in disposition.lower() or content_type.startswith(
                 "application/pdf"
             ):
                 filename = part.get_filename()
                 if filename and filename.lower().endswith(".pdf"):
                     has_pdf = True
-                    # Extract raw bytes
+                    # Get raw PDF bytes from the attachment
                     pdf_bytes = part.get_payload(decode=True)
 
                     if pdf_bytes:
                         try:
+                            # Extract text from PDF using pdfplumber
                             with pdfplumber.open(BytesIO(pdf_bytes)) as pdf:
-                                # Extract text page by page, preserving layout
+                                # Extract text from each page, respecting columns and reading order
                                 pages_text = []
                                 for page in pdf.pages:
-                                    # extract_text() respects columns & reading order
                                     page_text = page.extract_text() or ""
                                     pages_text.append(page_text)
 
+                                # Join pages with double newlines for separation
                                 full_text = "\n\n".join(pages_text)
 
+                                # Store attachment metadata and extracted content
                                 attachments.append(
                                     {
                                         "filename": filename,
@@ -199,12 +352,15 @@ class MailClient:
                                     }
                                 )
                         except Exception as e:
+                            # Silently handle PDF extraction failures
                             has_pdf = False
+
+        # Construct and return the Email object
         return Email(
             email_id=email_id,
             subject=subject,
             sender=sender,
-            body=body[:5000],
+            body=body[:5000],  # Truncate body to prevent memory issues
             has_pdf_attachment=has_pdf,
             attachments=attachments,
             received_at=received_at,
@@ -212,12 +368,16 @@ class MailClient:
 
 
 if __name__ == "__main__":
+    # Main block for testing the MailClient functionality
+    # This allows testing email sending without running the full application
+
     from src.config import load_config
 
     config = load_config()
 
     mail_client = MailClient(config)
 
+    # Send a test email with HTML content
     mail_client.send_email(
         ["loic.christen1@hes-so.ch"],
         "Es-tu daltonien ?",

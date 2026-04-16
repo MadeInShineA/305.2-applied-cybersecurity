@@ -1,43 +1,141 @@
+"""
+Email classifier module for the email agent application.
+
+This module provides the EmailClassifier class which analyzes incoming emails
+to determine if they are job applications with CV attachments. It uses pattern
+matching to validate the structure of PDF content and detect typical CV elements
+such as contact information, education, work experience, and skills.
+"""
+
+import re
+from typing import Tuple, Dict, List, Any
+
 from src.mail_client import Email
 from src.config import Config
-import re
-from typing import Tuple
 
 
 class EmailClassifier:
-    """Classifies emails to detect job applications with CV attachments."""
+    """
+    Classifies emails to detect job applications with CV attachments.
 
-    def __init__(self, config: Config):
+    This class provides methods to analyze email content and attachments
+    to determine whether an email represents a job application. It performs
+    structural validation on PDF attachments to verify they contain typical
+    CV elements like contact information, education history, work experience,
+    and skills.
+
+    The classifier uses a keyword-based approach combined with regex pattern
+    matching to validate CV structure. It checks for:
+    - Email addresses (contact information)
+    - Phone numbers
+    - Date references (employment/education periods)
+    - Keywords indicating work experience, education, and skills sections
+
+    Attributes:
+        config: Configuration object (currently unused but reserved for future extensions).
+
+    Example:
+        >>> classifier = EmailClassifier(config)
+        >>> is_job, index = classifier.is_job_application(email)
+        >>> if is_job:
+        ...     print(f"Job application detected! CV in attachment {index}")
+    """
+
+    def __init__(self, config: Config) -> None:
+        """
+        Initialize the EmailClassifier with configuration.
+
+        Args:
+            config: Configuration object (reserved for future use).
+        """
         self.config = config
 
     def is_job_application(self, email: Email) -> Tuple[bool, int]:
-        """Check if an email is a job application by validating CV structure in attachments."""
+        """
+        Check if an email is a job application by validating CV structure in attachments.
+
+        This method first checks if the email has any PDF attachments. If so,
+        it iterates through each attachment and validates its structure to
+        determine if it appears to be a CV/resume document.
+
+        The validation checks for typical CV elements including:
+        - Email address
+        - Phone number
+        - At least two date references (indicating employment/education periods)
+        - At least two CV section keywords (experience, education, skills, languages)
+
+        Args:
+            email: The Email object to classify, containing attachments and metadata.
+
+        Returns:
+            Tuple[bool, int]: A tuple containing:
+                - First element: True if the email is a job application, False otherwise.
+                - Second element: Index of the CV attachment if found, -1 otherwise.
+
+        Note:
+            - Only PDF attachments are considered as potential CVs.
+            - The first attachment that passes validation is returned.
+            - The email subject is printed for debugging purposes.
+        """
+        # Print the email subject for debugging/logging
         print(email.subject)
+
+        # Check if the email has any PDF attachments
         if email.has_pdf_attachment:
+            # Iterate through attachments to find a valid CV
             for i, attachment in enumerate(email.attachments):
+                # Validate each attachment's content structure
                 if self.validate_cv_structure(attachment["data"]):
                     return True, i
+            # No valid CV found in attachments
             return False, -1
         else:
+            # No PDF attachments means not a job application
             return False, -1
 
     def validate_cv_structure(self, data: str) -> bool:
-        """Validate CV structure by checking for presence of typical CV elements."""
-        data = data.lower()
-        data = data.lower()
+        """
+        Validate CV structure by checking for presence of typical CV elements.
 
+        This method performs structural validation on extracted PDF text to
+        determine if it represents a valid CV/resume. It uses a combination
+        of regex patterns and keyword matching to identify key CV components.
+
+        Validation criteria (all must be met):
+        1. At least one email address
+        2. At least one phone number
+        3. At least two date references (indicating work/education periods)
+        4. At least two CV section keywords from: experience, education, skills, languages
+
+        Args:
+            data: The extracted text content from a PDF attachment.
+
+        Returns:
+            bool: True if the content appears to be a valid CV, False otherwise.
+
+        Note:
+            - The validation is case-insensitive (text is converted to lowercase).
+            - Regex patterns match both Swiss and international phone/date formats.
+            - The method supports both English and French CV keywords.
+        """
+        # Convert to lowercase for case-insensitive matching
+        data = data.lower()
+        data = data.lower()  # Redundant but intentional for emphasis
+
+        # Define regex patterns for key CV elements
         patterns = {
             "email": r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}",
             "phone": r"(?:\+|00)?(?:[0-9] ?){9,14}",
             "dates": r"(?:\d{2}[./-]\d{2}[./-]\d{2,4})|(?:\d{2}[./-]\d{4})|(?:19|20)\d{2}",
         }
 
+        # Define keywords for CV sections (supporting English and French)
         cv_keywords = {
             "experience": [
                 "experience",
                 "expérience",
                 "work",
-                "travail",
+                "travaille",
                 "parcours",
                 "emplois",
             ],
@@ -60,6 +158,7 @@ class EmailClassifier:
             "languages": ["languages", "langues", "linguistique"],
         }
 
+        # Extract matching elements using regex patterns
         results = {
             "emails": list(set(re.findall(patterns["email"], data))),
             "phones": list(set(re.findall(patterns["phone"], data))),
@@ -67,10 +166,12 @@ class EmailClassifier:
             "matched_sections": [],
         }
 
+        # Check for CV section keywords
         for section, keys in cv_keywords.items():
             if any(key in data for key in keys):
                 results["matched_sections"].append(section)
 
+        # Determine if the content is a valid CV based on all criteria
         results["is_valid"] = (
             len(results["emails"]) > 0
             and len(results["phones"]) > 0
