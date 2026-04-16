@@ -1,4 +1,5 @@
 import requests
+
 from src.config import Config
 
 
@@ -28,7 +29,7 @@ class KDriveTools:
             ]
             return files_summary
         except requests.exceptions.RequestException as e:
-            raise RuntimeError("Error listing files: {e}")
+            raise RuntimeError(f"Error listing files: {e}")
 
     def upload_file(self, file_content, file_name, directory_id):
         url = f"{self.base_url}/3/drive/{self.config.kdrive_id}/upload"
