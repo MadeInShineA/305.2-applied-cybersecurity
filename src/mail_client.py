@@ -1,13 +1,28 @@
-import imaplib
-import email
 import datetime
+import email
+import imaplib
+import smtplib
+from dataclasses import dataclass
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 from email.policy import default
 from email.utils import parsedate_to_datetime
-from dataclasses import dataclass
-from typing import List, Optional
-from src.config import Config
-import pdfplumber
 from io import BytesIO
+from typing import List, Optional
+
+import pdfplumber
+
+if __name__ == "__main__":
+    import sys
+    from pathlib import Path
+
+    project_root = Path(__file__).parent.parent
+
+    if str(project_root) not in sys.path:
+        sys.path.insert(0, str(project_root))
+
+
+from src.config import Config
 
 
 def parse_email_date(date_str: str) -> Optional[str]:
@@ -56,7 +71,7 @@ class MailClient:
 
     def disconnect(self) -> None:
         """
-        Closes the connection safely.
+        Closes the IMAP connection safely.
         """
         if self._connection:
             try:
@@ -65,6 +80,40 @@ class MailClient:
             except Exception:
                 pass
             self._connection = None
+
+    def send_email(
+        self,
+        to_addresses: List[str],
+        subject: str,
+        body: str,
+        is_html: bool = False,
+    ) -> None:
+        """
+        Sends an email via SMTP using mail_smtp_host and mail_smtp_port.
+        """
+        msg = MIMEMultipart()
+        msg["From"] = self.config.mail_email
+        msg["To"] = ", ".join(to_addresses)
+        msg["Subject"] = subject
+
+        mime_type = "html" if is_html else "plain"
+        msg.attach(MIMEText(body, mime_type))
+
+        try:
+            if self.config.mail_smtp_port == 465:
+                server = smtplib.SMTP_SSL(
+                    self.config.mail_smtp_host, self.config.mail_smtp_port, timeout=30
+                )
+            else:
+                server = smtplib.SMTP(
+                    self.config.mail_smtp_host, self.config.mail_smtp_port, timeout=30
+                )
+                server.starttls()
+            with server:
+                server.login(self.config.mail_email, self.config.mail_password)
+                server.sendmail(self.config.mail_email, to_addresses, msg.as_string())
+        except Exception as e:
+            raise Exception(f"Failed to send email: {e}")
 
     def fetch_recent_emails(self, limit: int = 50) -> List[Email]:
         """
@@ -160,3 +209,20 @@ class MailClient:
             attachments=attachments,
             received_at=received_at,
         )
+
+
+if __name__ == "__main__":
+    from src.config import load_config
+
+    config = load_config()
+
+    mail_client = MailClient(config)
+
+    mail_client.send_email(
+        ["simon.masserey@hes-so.ch"],
+        "Es-tu daltonien ?",
+        """
+        <h1>Fait le test <a href="https://www.youtube.com/watch?v=ZzUsKizhb8o" target="_blank">ici</a></h1>
+        """,
+        is_html=True,
+    )
