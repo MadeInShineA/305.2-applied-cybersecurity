@@ -9,7 +9,6 @@ from langchain.agents import create_agent
 from langchain_community.tools import DuckDuckGoSearchResults
 from langchain_openrouter import ChatOpenRouter
 
-
 if __name__ == "__main__":
     import sys
     from pathlib import Path
@@ -135,7 +134,7 @@ class CvVeracityChecker:
             json.dump(log_data, f, indent=2, ensure_ascii=False, default=str)
 
     def verify_cv(
-        self, cv_json: dict, debug: bool = False, log_path: Optional[Path] = None
+        self, cv_json: dict, debug: bool = False, log_path: Path = None
     ) -> int:
         """
         Verifies the CV and returns an integer veracity score (0-100).
@@ -148,9 +147,6 @@ class CvVeracityChecker:
         Returns:
             An integer score between 0 and 100.
         """
-        if log_path is None:
-            log_path = project_root / "assets" / "cv_veracity_check_logs.json"
-
         try:
             response = self.agent.invoke(
                 {
@@ -176,7 +172,7 @@ class CvVeracityChecker:
                 score = max(0, min(100, int(numbers[-1])))
 
             # Save trace if debug is enabled
-            if debug:
+            if debug and log_path:
                 self._save_debug_trace(response, log_path, final_score=score)
 
             return score
@@ -194,7 +190,7 @@ if __name__ == "__main__":
     config = load_config()
     cv_verifier = CvVeracityChecker(config)
 
-    cv_json_path = project_root / "assets" / "cv.json"
+    cv_json_path = Path(__file__).parent.parent / "assets" / "cv.json"
     if not cv_json_path.exists():
         raise FileNotFoundError(
             f"CV JSON not found at: {cv_json_path}. Please run extraction first."
@@ -203,7 +199,9 @@ if __name__ == "__main__":
     with open(cv_json_path, "r", encoding="utf-8") as f:
         cv_json = json.load(f)
 
-    debug_log_path = project_root / "assets" / "cv_veracity_check_logs.json"
+    debug_log_path = (
+        Path(__file__).parent.parent / "assets" / "cv_veracity_check_logs.json"
+    )
 
     # Run verification with structured JSON logging
     score = cv_verifier.verify_cv(cv_json, debug=True, log_path=debug_log_path)
