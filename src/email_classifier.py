@@ -8,7 +8,7 @@ such as contact information, education, work experience, and skills.
 """
 
 import re
-from typing import Tuple, Dict, List, Any
+from typing import Tuple
 
 from src.mail_client import Email
 from src.config import Config

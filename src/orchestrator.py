@@ -21,7 +21,7 @@ and ensures proper cleanup of resources on exit.
 
 import signal
 import time
-from typing import List, Optional
+from typing import List
 
 from docling.document_converter import DocumentConverter
 

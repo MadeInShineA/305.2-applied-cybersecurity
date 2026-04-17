@@ -8,7 +8,6 @@ values are loaded from environment variables using python-dotenv.
 
 import os
 from dataclasses import dataclass
-from typing import Optional
 
 from dotenv import load_dotenv
 

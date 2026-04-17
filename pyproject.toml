@@ -5,7 +5,7 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = "==3.12.*"
 dependencies = [
-    "ddgs>=9.13.1",
+    "ddgs>=9.14.0",
     "docling>=2.88.0",
     "dotenv>=0.9.9",
     "langchain>=1.2.15",

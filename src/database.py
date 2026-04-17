@@ -7,7 +7,7 @@ It uses PyMySQL to connect to a MySQL database and provides methods for
 creating, reading, and updating data across multiple tables.
 """
 
-from typing import Optional, List, Dict, Any
+from typing import Optional
 
 import pymysql
 from pymysql.cursors import DictCursor

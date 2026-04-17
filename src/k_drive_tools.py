@@ -10,7 +10,7 @@ for all API operations.
 """
 
 import requests
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any
 
 from src.config import Config
 
