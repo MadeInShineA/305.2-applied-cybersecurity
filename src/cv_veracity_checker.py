@@ -23,6 +23,9 @@ from typing import Optional, Dict, Any
 from langchain.agents import create_agent
 from langchain_community.tools import DuckDuckGoSearchResults
 from langchain_openai import ChatOpenAI
+from langchain_core.tools import BaseTool
+from requests.exceptions import ConnectionError, Timeout, RequestException
+from pydantic import PrivateAttr
 
 if __name__ == "__main__":
     import sys
@@ -34,6 +37,38 @@ if __name__ == "__main__":
         sys.path.insert(0, str(project_root))
 
 from src.config import Config
+
+
+class ResilientSearchTool(BaseTool):
+    """
+    A wrapper around DuckDuckGoSearchResults that ignores connection errors
+    and returns empty results, allowing the agent to continue verification.
+    """
+
+    name: str = "resilient_search"
+    description: str = (
+        "Search the web. If the search fails, returns empty results and continues."
+    )
+
+    # Declare as a private Pydantic attribute to avoid validation errors
+    _base_tool: DuckDuckGoSearchResults = PrivateAttr()
+
+    def __init__(self, base_tool: DuckDuckGoSearchResults):
+        super().__init__()
+        self._base_tool = base_tool
+
+    def _run(self, query: str) -> str:
+        try:
+            return self._base_tool.run(query)
+        except (ConnectionError, Timeout, RequestException) as e:
+            print(f"Search failed (ignored): {query} — {type(e).__name__}: {e}")
+            return "[]"
+        except Exception as e:
+            print(f"Unexpected search error (ignored): {query} — {e}")
+            return "[]"
+
+    async def _arun(self, query: str) -> str:
+        return self._run(query)
 
 
 class CvVeracityChecker:
@@ -85,7 +120,8 @@ class CvVeracityChecker:
         )
 
         # Initialize DuckDuckGo search tool for web verification
-        self.search_tool = DuckDuckGoSearchResults()
+        search_tool = DuckDuckGoSearchResults()
+        self.search_tool = ResilientSearchTool(search_tool)
 
         # Define system prompt for the verification agent
         self.system_prompt = """

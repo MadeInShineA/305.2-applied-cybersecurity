@@ -46,7 +46,7 @@ class KDriveTools:
             config: Config object containing Infomaniak API key and kDrive ID.
         """
         self.config = config
-        self.base_url = f"https://api.infomaniak.com"
+        self.base_url = "https://api.infomaniak.com"
         self.headers = {"Authorization": f"Bearer {self.config.infomaniak_api_key}"}
 
     def list_files(self, directory_id: str) -> List[Dict[str, Any]]:
@@ -202,9 +202,6 @@ class KDriveTools:
             # Verify this is a file, not a directory
             if data.get("type") == "dir":
                 raise ValueError("Error: Cannot download a directory.")
-
-            # Extract filename from metadata
-            filename = data.get("name", f"{file_id}.bin")
 
         except requests.exceptions.RequestException as e:
             return RuntimeError(f"Error retrieving file name: {e}")
