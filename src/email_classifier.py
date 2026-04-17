@@ -77,8 +77,6 @@ class EmailClassifier:
             - The first attachment that passes validation is returned.
             - The email subject is printed for debugging purposes.
         """
-        # Print the email subject for debugging/logging
-        print(email.subject)
 
         # Check if the email has any PDF attachments
         if email.has_pdf_attachment:

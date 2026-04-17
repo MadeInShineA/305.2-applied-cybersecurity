@@ -253,7 +253,9 @@ class Orchestrator:
                 self.db.create_email_entry(email.email_id, email.received_at)
 
                 # Log which email we're checking
-                print(f"Checking email: {email.subject[:50]}...")
+                print(
+                    f"Checking email:\n\tsender:{email.sender}\n\tsubject:{email.subject[:50]}..."
+                )
 
                 # Check if this is a job application with CV
                 is_job, attachment_index = self.classifier.is_job_application(email)
