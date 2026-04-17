@@ -21,7 +21,7 @@ from typing import Dict, Any
 from docling.document_converter import DocumentConverter, DocumentStream
 from langchain_core.output_parsers import JsonOutputParser
 from langchain_core.prompts import ChatPromptTemplate
-from langchain_openrouter import ChatOpenRouter
+from langchain_openai import ChatOpenAI
 import json
 
 if __name__ == "__main__":
@@ -77,8 +77,11 @@ class CvExtractor:
         """
         self.config = config
         self.converter = converter
-        self.llm = ChatOpenRouter(
-            model=self.config.openrouter_model, temperature=0, max_tokens=4096
+        self.llm = ChatOpenAI(
+            model=self.config.infomaniak_model,
+            temperature=0,
+            openai_api_key=self.config.infomaniak_ai_api_key,
+            openai_api_base=self.config.infomaniak_base_url,
         )
 
     def extract_cv_to_json(self, cv_pdf_bytes: bytes) -> Dict[str, Any]:

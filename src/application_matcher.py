@@ -19,7 +19,7 @@ import re
 from typing import Dict, Any, List, Tuple
 
 import pdfplumber
-from langchain_openrouter import ChatOpenRouter
+from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_core.output_parsers import JsonOutputParser
 
@@ -65,7 +65,12 @@ class ApplicationMatcher:
         self.config = config
         self.kdrive_tools = kdrive_tools
         # Using a temperature of 0 for deterministic evaluation
-        self.llm = ChatOpenRouter(model=self.config.openrouter_model, temperature=0)
+        self.llm = ChatOpenAI(
+            model=self.config.infomaniak_model,
+            temperature=0,
+            openai_api_key=self.config.infomaniak_ai_api_key,
+            openai_api_base=self.config.infomaniak_base_url,
+        )
         self.output_parser = JsonOutputParser()
 
     def get_job_offers(self) -> List[Dict[str, Any]]:

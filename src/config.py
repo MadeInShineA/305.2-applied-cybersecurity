@@ -20,12 +20,13 @@ class Config:
 
     This dataclass serves as the central configuration container for the entire
     email agent application. It encapsulates credentials for various services
-    including OpenRouter (LLM), Infomaniak kDrive, MySQL database, and email
+    including Infomaniak AI (LLM), Infomaniak kDrive, MySQL database, and email
     via SMTP/IMAP protocols.
 
     Attributes:
-        openrouter_api_key: API key for OpenRouter service (used for LLM calls).
-        openrouter_model: Model identifier for OpenRouter (default: nvidia/nemotron-3-nano-30b-a3b).
+        infomaniak_ai_api_key: API key for Infomaniak AI services (used for LLM calls via Infomaniak).
+        infomaniak_base_url: Base URL for Infomaniak API (constructed from product ID).
+        infomaniak_model: Model identifier for Infomaniak AI services (default: openai/gpt-oss-120b).
         infomaniak_api_key: API key for Infomaniak services (kDrive, mail).
         kdrive_id: Unique identifier for the Infomaniak kDrive instance.
         kdrive_verified_directory_id: Directory ID for storing verified CVs in kDrive.
@@ -43,8 +44,9 @@ class Config:
         mail_password: Password for the email account.
         poll_interval_seconds: Interval in seconds between email polling cycles (default: 300).
 
-    openrouter_api_key: str
-    openrouter_model: str
+    infomaniak_ai_api_key: str
+    infomaniak_base_url: str
+    infomaniak_model: str
     infomaniak_api_key: str
     kdrive_id: str
     kdrive_verified_directory_id: str
@@ -68,8 +70,9 @@ class Config:
         nvidia/nemotron-3-nano-30b-a3b
     """
 
-    openrouter_api_key: str
-    openrouter_model: str
+    infomaniak_ai_api_key: str
+    infomaniak_base_url: str
+    infomaniak_model: str
     infomaniak_api_key: str
     kdrive_id: str
     kdrive_verified_directory_id: str
@@ -114,10 +117,9 @@ def load_config() -> Config:
     """
     load_dotenv()
     return Config(
-        openrouter_api_key=os.getenv("OPENROUTER_API_KEY", ""),
-        openrouter_model=os.getenv(
-            "OPENROUTER_MODEL", "nvidia/nemotron-3-nano-30b-a3b"
-        ),
+        infomaniak_ai_api_key=os.getenv("INFOMANIAK_AI_API_KEY", ""),
+        infomaniak_base_url=os.getenv("INFOMANIAK_BASE_URL", ""),
+        infomaniak_model=os.getenv("INFOMANIAK_MODEL", "openai/gpt-oss-120b"),
         infomaniak_api_key=os.getenv("INFOMANIAK_API_KEY", ""),
         kdrive_id=os.getenv("KDRIVE_ID"),
         kdrive_verified_directory_id=os.getenv("KDRIVE_VERIFIED_CV_DIRECTORY_ID"),

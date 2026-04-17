@@ -230,7 +230,7 @@ class Orchestrator:
             - Match results and email responses are logged and stored.
         """
         # Fetch recent emails using the mail client
-        print("Fetching recent emails via REST API...")
+        print("Fetching recent emails via IMAP...")
         emails: List[Email] = self.mail_client.fetch_recent_emails(limit=50)
         print(f"Found {len(emails)} emails in inbox")
 

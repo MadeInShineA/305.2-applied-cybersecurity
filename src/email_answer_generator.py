@@ -19,7 +19,7 @@ from typing import Optional, Dict, Any
 
 from langchain_core.output_parsers import JsonOutputParser
 from langchain_core.prompts import ChatPromptTemplate
-from langchain_openrouter import ChatOpenRouter
+from langchain_openai import ChatOpenAI
 
 # Handle imports for main block execution
 if __name__ == "__main__":
@@ -90,8 +90,11 @@ class EmailAnswerGenerator:
             config: Config object containing OpenRouter API settings.
         """
         self.config = config
-        self.llm = ChatOpenRouter(
-            model=self.config.openrouter_model, temperature=0.0, max_tokens=4096
+        self.llm = ChatOpenAI(
+            model=self.config.infomaniak_model,
+            temperature=0,
+            openai_api_key=self.config.infomaniak_ai_api_key,
+            openai_api_base=self.config.infomaniak_base_url,
         )
 
     def generate_email_answer(

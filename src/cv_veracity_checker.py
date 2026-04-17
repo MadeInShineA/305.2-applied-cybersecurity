@@ -22,7 +22,7 @@ from typing import Optional, Dict, Any
 
 from langchain.agents import create_agent
 from langchain_community.tools import DuckDuckGoSearchResults
-from langchain_openrouter import ChatOpenRouter
+from langchain_openai import ChatOpenAI
 
 if __name__ == "__main__":
     import sys
@@ -77,8 +77,11 @@ class CvVeracityChecker:
         self.config = config
 
         # Initialize LLM with deterministic settings (temperature=0)
-        self.llm = ChatOpenRouter(
-            model=self.config.openrouter_model, temperature=0, max_tokens=4096
+        self.llm = ChatOpenAI(
+            model=self.config.infomaniak_model,
+            temperature=0,
+            openai_api_key=self.config.infomaniak_ai_api_key,
+            openai_api_base=self.config.infomaniak_base_url,
         )
 
         # Initialize DuckDuckGo search tool for web verification
