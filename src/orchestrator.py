@@ -244,127 +244,135 @@ class Orchestrator:
 
         # Process each email in the batch
         for email in emails:
-            # Check if this email has already been processed
-            if self.db.email_exists(email.email_id):
-                continue
+            try:
+                # Check if this email has already been processed
+                if self.db.email_exists(email.email_id):
+                    continue
 
-            # Record the email in the database as processed
-            self.db.create_email_entry(email.email_id, email.received_at)
+                # Record the email in the database as processed
+                self.db.create_email_entry(email.email_id, email.received_at)
 
-            # Log which email we're checking
-            print(f"Checking email: {email.subject[:50]}...")
+                # Log which email we're checking
+                print(f"Checking email: {email.subject[:50]}...")
 
-            # Check if this is a job application with CV
-            is_job, attachment_index = self.classifier.is_job_application(email)
+                # Check if this is a job application with CV
+                is_job, attachment_index = self.classifier.is_job_application(email)
 
-            # Handle job applications
-            if is_job:
-                print("Job application detected!")
+                # Handle job applications
+                if is_job:
+                    print("Job application detected!")
 
-                # Extract CV data from the PDF attachment
-                extracted_cv = self.cv_extractor.extract_cv_to_json(
-                    email.attachments[attachment_index]["bytes"]
-                )
-
-                # Extract candidate name from the CV data
-                person_data = extracted_cv.get("person", {})
-                candidate_name = person_data.get("name", "unknown")
-
-                # Generate a filename based on candidate name or sender
-                file_name = (
-                    candidate_name.lower().replace(" ", "-")
-                    if candidate_name
-                    else f"cv-{email.sender}"
-                )
-
-                # Ensure we have a valid filename
-                if not file_name:
-                    file_name = f"cv-{email.sender}"
-
-                print(f"Extracted cv for: {file_name if file_name else 'unknown'}")
-
-                # Verify the CV authenticity using web search
-                cv_verification_score = self.cv_veracity_checker.verify_cv(extracted_cv)
-
-                print(f"The cv got a verification score of: {cv_verification_score}")
-
-                # Determine if CV is verified based on score threshold
-                is_cv_verified = cv_verification_score >= 50
-
-                # Handle verified CVs
-                if is_cv_verified:
-                    print("Cv classified as verified")
-
-                    # Upload CV to verified directory on kDrive
-                    self.kdrive_tools.upload_file(
-                        email.attachments[attachment_index]["bytes"],
-                        file_name,
-                        self.config.kdrive_verified_directory_id,
+                    # Extract CV data from the PDF attachment
+                    extracted_cv = self.cv_extractor.extract_cv_to_json(
+                        email.attachments[attachment_index]["bytes"]
                     )
 
-                    print("Cv file saved on Kdrive")
+                    # Extract candidate name from the CV data
+                    person_data = extracted_cv.get("person", {})
+                    candidate_name = person_data.get("name", "unknown")
 
-                    # Compare CV against available job offers
-                    match_score, best_match_offer, best_report = (
-                        self.matcher.compare_with_offers(extracted_cv)
+                    # Generate a filename based on candidate name or sender
+                    file_name = (
+                        candidate_name.lower().replace(" ", "-")
+                        if candidate_name
+                        else f"cv-{email.sender}"
                     )
 
-                    # Log the match score
-                    print(f"Best match score: {match_score}")
+                    # Ensure we have a valid filename
+                    if not file_name:
+                        file_name = f"cv-{email.sender}"
 
-                    # Store the job offer comparison in the database
-                    self.db.save_job_offer_comparison(
-                        email_id=email.email_id,
-                        match_score=match_score,
-                        offer_name=best_match_offer.get("name", ""),
-                        offer_id=best_match_offer.get("id", ""),
-                        strengths=str(best_report.get("strengths", [])),
-                        weaknesses=str(best_report.get("weaknesses", [])),
-                        recommendation=best_report.get("recommendation", ""),
+                    print(f"Extracted cv for: {file_name if file_name else 'unknown'}")
+
+                    # Verify the CV authenticity using web search
+                    cv_verification_score = self.cv_veracity_checker.verify_cv(
+                        extracted_cv
                     )
 
-                    # Generate a professional email response
-                    email_answer: EmailAnswer = (
-                        self.email_answer_generator.generate_email_answer(
-                            email, candidate_name, best_match_offer
+                    print(
+                        f"The cv got a verification score of: {cv_verification_score}"
+                    )
+
+                    # Determine if CV is verified based on score threshold
+                    is_cv_verified = cv_verification_score >= 50
+
+                    # Handle verified CVs
+                    if is_cv_verified:
+                        print("Cv classified as verified")
+
+                        # Upload CV to verified directory on kDrive
+                        self.kdrive_tools.upload_file(
+                            email.attachments[attachment_index]["bytes"],
+                            file_name,
+                            self.config.kdrive_verified_directory_id,
                         )
-                    )
 
-                    print("Email answer generated")
+                        print("Cv file saved on Kdrive")
 
-                    # Send the response email to the applicant
-                    self.mail_client.send_email(
-                        [
-                            email_answer.address
-                        ],  # Wrap in list as send_email expects list
-                        email_answer.subject,
-                        email_answer.body,
-                    )
+                        # Compare CV against available job offers
+                        match_score, best_match_offer, best_report = (
+                            self.matcher.compare_with_offers(extracted_cv)
+                        )
 
-                    print("Email answer sent")
+                        # Log the match score
+                        print(f"Best match score: {match_score}")
 
-                    # Increment counter for new job applications
-                    new_job_applications += 1
+                        # Store the job offer comparison in the database
+                        self.db.save_job_offer_comparison(
+                            email_id=email.email_id,
+                            match_score=match_score,
+                            offer_name=best_match_offer.get("name", ""),
+                            offer_id=best_match_offer.get("id", ""),
+                            strengths=str(best_report.get("strengths", [])),
+                            weaknesses=str(best_report.get("weaknesses", [])),
+                            recommendation=best_report.get("recommendation", ""),
+                        )
 
-                # Handle non-verified CVs
+                        # Generate a professional email response
+                        email_answer: EmailAnswer = (
+                            self.email_answer_generator.generate_email_answer(
+                                email, candidate_name, best_match_offer
+                            )
+                        )
+
+                        print("Email answer generated")
+
+                        # Send the response email to the applicant
+                        self.mail_client.send_email(
+                            [
+                                email_answer.address
+                            ],  # Wrap in list as send_email expects list
+                            email_answer.subject,
+                            email_answer.body,
+                        )
+
+                        print("Email answer sent")
+
+                        # Increment counter for new job applications
+                        new_job_applications += 1
+
+                    # Handle non-verified CVs
+                    else:
+                        print("Cv classified as not verified")
+
+                        # Upload CV to the not-verified directory on kDrive
+                        self.kdrive_tools.upload_file(
+                            email.attachments[attachment_index]["bytes"],
+                            file_name,
+                            self.config.kdrive_not_verified_directory_id,
+                        )
+
+                        print("Cv file saved on Kdrive")
+
+                # Handle non-job-application emails
                 else:
-                    print("Cv classified as not verified")
+                    print("Not a job application")
 
-                    # Upload CV to the not-verified directory on kDrive
-                    self.kdrive_tools.upload_file(
-                        email.attachments[attachment_index]["bytes"],
-                        file_name,
-                        self.config.kdrive_not_verified_directory_id,
-                    )
-
-                    print("Cv file saved on Kdrive")
-
-            # Handle non-job-application emails
-            else:
-                print("Not a job application")
-
-            # Display separator after processing each email
-            print("-" * 50)
+                # Display separator after processing each email
+                print("-" * 50)
+            except Exception as e:
+                print(f"Error processing email {email.email_id}: {e}")
+                print("-" * 50)
 
         # Print summary if we processed any emails
         if len(emails) > 0:

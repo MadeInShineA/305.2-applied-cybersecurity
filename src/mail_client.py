@@ -351,7 +351,7 @@ class MailClient:
                                         "metadata": pdf.metadata,
                                     }
                                 )
-                        except Exception as e:
+                        except Exception as _:
                             # Silently handle PDF extraction failures
                             has_pdf = False
 

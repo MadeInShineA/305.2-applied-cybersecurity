@@ -287,6 +287,7 @@ class CvVeracityChecker:
             >>> if score > 50:
             ...     print("CV verified - proceeding with application")
         """
+
         # Default log path if not specified and debug is enabled
         if debug and log_path is None:
             log_path = (
