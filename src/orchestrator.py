@@ -340,12 +340,10 @@ class Orchestrator:
                         print("Email answer generated")
 
                         # Send the response email to the applicant
-                        self.mail_client.send_email(
-                            [
-                                email_answer.address
-                            ],  # Wrap in list as send_email expects list
-                            email_answer.subject,
-                            email_answer.body,
+                        self.mail_client.answer_email(
+                            original_email=email,
+                            body=email_answer.body,
+                            subject=email.subject,
                         )
 
                         print("Email answer sent")

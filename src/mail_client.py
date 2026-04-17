@@ -222,6 +222,88 @@ class MailClient:
         except Exception as e:
             raise Exception(f"Failed to send email: {e}")
 
+    def answer_email(
+        self,
+        original_email: Email,
+        body: str,
+        subject: Optional[str] = None,
+        is_html: bool = False,
+        cc_addresses: Optional[List[str]] = None,
+    ) -> None:
+        """
+        Send a reply email via SMTP, properly threaded to the original email.
+
+        This method constructs a MIME multipart message that replies to a
+        specific email by setting appropriate headers (In-Reply-To, References)
+        for proper email threading in mail clients.
+
+        Args:
+            original_email: The Email object being replied to (contains email_id).
+            body: The reply body content (plain text or HTML).
+            subject: Optional custom subject. If None, uses "Re: {original_subject}".
+            is_html: If True, the body is treated as HTML; otherwise as plain text.
+            cc_addresses: Optional list of CC recipient email addresses.
+
+        Raises:
+            Exception: If SMTP connection or sending fails.
+
+        Note:
+            - Automatically extracts the original sender from original_email.sender
+            - Adds "Re: " prefix to subject if not already present
+            - Sets In-Reply-To and References headers for email threading
+            - Reply-To is set to the original sender by default
+        """
+        msg = MIMEMultipart()
+        msg["From"] = self.config.mail_email
+
+        # Extract recipient from original email's sender
+        # Handle cases where sender might be "Name <email>" format
+        original_sender = original_email.sender
+        if "<" in original_sender and ">" in original_sender:
+            # Extract email address from "Name <email@domain.com>" format
+            original_sender = original_sender.split("<")[1].split(">")[0].strip()
+
+        msg["To"] = original_sender
+        msg["In-Reply-To"] = original_email.email_id
+        msg["References"] = original_email.email_id
+
+        # Handle subject with Re: prefix
+        if subject is None:
+            original_subject = original_email.subject
+            if not original_subject.lower().startswith("re:"):
+                subject = f"Re: {original_subject}"
+            else:
+                subject = original_subject
+        msg["Subject"] = subject
+
+        # Add CC recipients if provided
+        if cc_addresses:
+            msg["Cc"] = ", ".join(cc_addresses)
+
+        mime_type = "html" if is_html else "plain"
+        msg.attach(MIMEText(body, mime_type))
+
+        # Build recipient list (To + CC)
+        to_addresses = [original_sender]
+        if cc_addresses:
+            to_addresses.extend(cc_addresses)
+
+        try:
+            if self.config.mail_smtp_port == 465:
+                server = smtplib.SMTP_SSL(
+                    self.config.mail_smtp_host, self.config.mail_smtp_port, timeout=30
+                )
+            else:
+                server = smtplib.SMTP(
+                    self.config.mail_smtp_host, self.config.mail_smtp_port, timeout=30
+                )
+                server.starttls()
+            with server:
+                server.login(self.config.mail_email, self.config.mail_password)
+                server.sendmail(self.config.mail_email, to_addresses, msg.as_string())
+        except Exception as e:
+            raise Exception(f"Failed to send reply email: {e}")
+
     def fetch_recent_emails(self, limit: int = 50) -> List[Email]:
         """
         Fetch the most recent emails using IMAP commands.
