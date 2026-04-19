@@ -7,7 +7,7 @@ It uses PyMySQL to connect to a MySQL database and provides methods for
 creating, reading, and updating data across multiple tables.
 """
 
-from typing import Optional
+from typing import Optional, List, Dict, Any
 
 import pymysql
 from pymysql.cursors import DictCursor
@@ -116,7 +116,9 @@ class Database:
                 CREATE TABLE IF NOT EXISTS emails (
                     email_id VARCHAR(255) PRIMARY KEY,
                     checked_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    received_at TIMESTAMP NULL
+                    received_at TIMESTAMP NULL,
+                    subject VARCHAR(255),
+                    body VARCHAR(255)
 
                 )
             """)
@@ -125,8 +127,8 @@ class Database:
                 CREATE TABLE IF NOT EXISTS job_applications (
                     id INT AUTO_INCREMENT PRIMARY KEY,
                     email_id VARCHAR(255) UNIQUE NOT NULL,
-                    sender_email VARCHAR(255),
-                    subject VARCHAR(500),
+                    candidate_email VARCHAR(255),
+                    candidate_name VARCHAR(255),
                     classified_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     FOREIGN KEY (email_id) REFERENCES emails(email_id)
                         ON DELETE CASCADE
@@ -151,6 +153,34 @@ class Database:
                 )
             """)
 
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS hr_responses (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    match_id INT NOT NULL,
+                    hr_email_sent BOOLEAN DEFAULT FALSE,
+                    sent_at TIMESTAMP NULL,
+                    candidate_email VARCHAR(255),
+                    offer_name VARCHAR(500),
+                    email_subject VARCHAR(500),
+                    email_body VARCHAR(5000),
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (match_id) REFERENCES job_offer_matches(id)
+                        ON DELETE CASCADE
+                        ON UPDATE CASCADE
+                )
+            """)
+
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS hr_users (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    username VARCHAR(255) UNIQUE NOT NULL,
+                    password_hash VARCHAR(255) NOT NULL,
+                    full_name VARCHAR(255) NOT NULL,
+                    job_title VARCHAR(255) NOT NULL,
+                    phone VARCHAR(50) NOT NULL
+                )
+            """)
+
             self._connection.commit()
 
     def drop_tables(self) -> None:
@@ -171,9 +201,11 @@ class Database:
             self.connect()
 
         with self._connection.cursor() as cursor:
+            cursor.execute("DROP TABLE IF EXISTS hr_responses")
             cursor.execute("DROP TABLE IF EXISTS job_offer_matches")
             cursor.execute("DROP TABLE IF EXISTS job_applications")
             cursor.execute("DROP TABLE IF EXISTS emails")
+            cursor.execute("DROP TABLE IF EXISTS hr_users")
             self._connection.commit()
 
     def email_exists(self, email_id: str) -> bool:
@@ -201,7 +233,9 @@ class Database:
             cursor.execute("SELECT 1 FROM emails WHERE email_id = %s", (email_id,))
             return cursor.fetchone() is not None
 
-    def create_email_entry(self, email_id: str, received_at: str) -> None:
+    def create_email_entry(
+        self, email_id: str, received_at: str, email_subject: str, email_body: str
+    ) -> None:
         """
         Record a processed email in the database.
 
@@ -222,16 +256,16 @@ class Database:
 
         with self._connection.cursor() as cursor:
             cursor.execute(
-                "INSERT IGNORE INTO emails (email_id, received_at) VALUES (%s, %s)",
-                (email_id, received_at),
+                "INSERT IGNORE INTO emails (email_id, received_at, subject, body) VALUES (%s, %s, %s, %s)",
+                (email_id, received_at, email_subject, email_body),
             )
             self._connection.commit()
 
     def save_job_application(
         self,
         email_id: str,
-        sender_email: str,
-        subject: str,
+        candidate_email: str,
+        candidate_name: str,
     ) -> bool:
         """
         Save a job application entry to the database.
@@ -242,8 +276,7 @@ class Database:
 
         Args:
             email_id: The unique identifier of the original email.
-            sender_email: The email address of the job applicant.
-            subject: The subject line of the job application email.
+            candidate_email: The email address of the job applicant.
 
         Returns:
             bool: True if the job application was saved successfully, False if
@@ -263,10 +296,10 @@ class Database:
                 cursor.execute(
                     """
                     INSERT INTO job_applications
-                    (email_id, sender_email, subject)
+                    (email_id, candidate_email, candidate_name)
                     VALUES (%s, %s, %s)
                     """,
-                    (email_id, sender_email, subject),
+                    (email_id, candidate_email, candidate_name),
                 )
                 self._connection.commit()
             return True
@@ -333,6 +366,109 @@ class Database:
                         weaknesses,
                         recommendation,
                     ),
+                )
+                self._connection.commit()
+            return True
+        except Exception:
+            raise
+
+    def get_candidate_job_matches(self, limit: int = 10) -> List[Dict[str, Any]]:
+        """
+        Retrieve candidate/job offer matches from the database.
+
+        Args:
+            limit: Maximum number of records to return (default 10).
+
+        Returns:
+            List of dictionaries containing match information.
+        """
+        if not self._connection:
+            self.connect()
+
+        with self._connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT 
+                    e.subject,
+                    e.received_at,
+                    e.body,
+                    m.id,
+                    m.email_id,
+                    m.match_score,
+                    m.offer_name,
+                    m.offer_id,
+                    m.strengths,
+                    m.weaknesses,
+                    m.recommendation,
+                    a.candidate_email,
+                    a.candidate_name,
+                    r.hr_email_sent
+                FROM job_offer_matches m
+                JOIN job_applications a ON m.email_id = a.email_id
+                JOIN emails e ON m.email_id = e.email_id
+                LEFT JOIN hr_responses r ON m.id = r.match_id
+                ORDER BY m.match_score DESC
+                LIMIT %s
+            """,
+                (limit,),
+            )
+            return cursor.fetchall()
+
+    def is_match_processed_by_hr(self, match_id: int) -> bool:
+        """
+        Check if a candidate/job match has already been processed by HR.
+
+        Args:
+            match_id: The ID of the job_offer_matches record.
+
+        Returns:
+            bool: True if HR has already sent a response, False otherwise.
+        """
+        if not self._connection:
+            self.connect()
+
+        with self._connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT hr_email_sent 
+                FROM hr_responses 
+                WHERE match_id = %s AND hr_email_sent = TRUE
+            """,
+                (match_id,),
+            )
+            return cursor.fetchone() is not None
+
+    def save_hr_response(
+        self,
+        match_id: int,
+        candidate_email: str,
+        offer_name: str,
+        email_subject: str,
+        email_body: str,
+    ) -> bool:
+        """
+        Record an HR response to a candidate/job match.
+
+        Args:
+            match_id: The ID of the job_offer_matches record.
+            candidate_email: The email address of the candidate.
+            offer_name: The name of the job offer.
+
+        Returns:
+            bool: True if the response was saved successfully.
+        """
+        if not self._connection:
+            self.connect()
+
+        try:
+            with self._connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    INSERT INTO hr_responses
+                    (match_id, candidate_email, offer_name, email_subject, email_body)
+                    VALUES (%s, %s, %s, %s, %s)
+                """,
+                    (match_id, candidate_email, offer_name, email_subject, email_body),
                 )
                 self._connection.commit()
             return True

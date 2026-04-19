@@ -5,12 +5,15 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = "==3.12.*"
 dependencies = [
+    "bcrypt>=5.0.0",
     "ddgs>=9.14.0",
     "docling>=2.88.0",
     "dotenv>=0.9.9",
     "langchain>=1.2.15",
+    "langchain-classic>=1.0.3",
     "langchain-community>=0.4.1",
     "langchain-openai>=1.1.14",
+    "langchainhub>=0.1.21",
     "pdfplumber>=0.11.9",
     "pymysql>=1.1.0",
     "requests>=2.31.0",

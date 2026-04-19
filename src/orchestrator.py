@@ -250,7 +250,9 @@ class Orchestrator:
                     continue
 
                 # Record the email in the database as processed
-                self.db.create_email_entry(email.email_id, email.received_at)
+                self.db.create_email_entry(
+                    email.email_id, email.received_at, email.subject, email.body
+                )
 
                 # Log which email we're checking
                 print(
@@ -283,6 +285,13 @@ class Orchestrator:
                     # Ensure we have a valid filename
                     if not file_name:
                         file_name = f"cv-{email.sender}"
+
+                    # Save in job applications table with attachment info
+                    self.db.save_job_application(
+                        email_id=email.email_id,
+                        candidate_email=email.sender,
+                        candidate_name=candidate_name,
+                    )
 
                     print(f"Extracted cv for: {file_name if file_name else 'unknown'}")
 
@@ -333,7 +342,7 @@ class Orchestrator:
                         # Generate a professional email response
                         email_answer: EmailAnswer = (
                             self.email_answer_generator.generate_email_answer(
-                                email, candidate_name, best_match_offer
+                                email, candidate_name, best_report
                             )
                         )
 

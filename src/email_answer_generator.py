@@ -159,7 +159,8 @@ class EmailAnswerGenerator:
                     (
                         "You are an expert recruitment assistant. Draft a professional email response to a spontaneous job applicant. "
                         "Use the provided original email, candidat name and match evaluation report to craft your reply. "
-                        "If the matching score is above 50, try to fix an appointment"
+                        "Specify in the replay that this email was generated automatically by our AI agent"
+                        "If the matching score is above 50, say that our HR department will contact them shortly"
                         "Be very profesional and respectful, don't discriminate in anyway"
                         "Return ONLY a valid JSON object with exactly these two keys: 'subject' and 'body'. "
                         "- 'subject': A clear, professional subject line regarding their application. "
@@ -167,7 +168,7 @@ class EmailAnswerGenerator:
                         "evaluation (strengths and gaps), and clearly communicate the recommendation or next steps. "
                         "Maintain a courteous, professional tone. Reply in the same language as the original email. based on the body and the match report"
                         "For the signature ,use this information: "
-                        "Nom du rectureur: Lara Clète, poste: Cheffe RH, entreprise: TechCorp, coordonnées: lara.clete@ctrobon.ch, +41 79 123 45 67."
+                        "Tech corp AI agent"
                         "Do not include markdown formatting, code blocks, or any text outside the JSON."
                     ),
                 ),
