@@ -6,6 +6,7 @@ readme = "README.md"
 requires-python = "==3.12.*"
 dependencies = [
     "bcrypt>=5.0.0",
+    "chainlit>=2.11.0",
     "ddgs>=9.14.0",
     "docling>=2.88.0",
     "dotenv>=0.9.9",
