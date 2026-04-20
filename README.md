@@ -1,15 +1,27 @@
 # 305.2 Applied Cybersecurity
 
-This repository contains the work of the team α done for the 305.2 Applied Cybersecurity course.
+This repository contains the work of Team α for the 305.2 Applied Cybersecurity course.
 
-## Repository structure
+## Repository Structure
 
 ```
-├── application/   # The developped application
-├── docs/          # The documentation
-└── reports/       # The created bug reports
+├── application/    # Main email job application agent with HR chatbot interface
+├── docs/           # Documentation on LLM agent security
+└── reports/        # Bug reports and vulnerability findings
 ```
 
-## The application
+## Project Overview
 
-To get more information about our application, please checkout its [README](./application/README.md)
+This project is an automated HR email agent system that:
+- Monitors email inbox for job applications with CV attachments
+- Extracts and verifies candidate CV data using AI
+- Matches candidates against available job offers
+- Provides an interactive HR chatbot interface for reviewing and communicating with candidates
+
+## Quick Links
+
+| Folder | Description |
+|--------|-------------|
+| [application/](application/) | Main application - email agent & HR chatbot |
+| [docs/](docs/) | Security documentation for LLM agents |
+| [reports/](reports/) | Bug reports and security findings |

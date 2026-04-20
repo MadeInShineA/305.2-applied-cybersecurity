@@ -1,9 +1,11 @@
 """
 Main application file for the HR Email Assistant using Chainlit.
 
-This application integrates all modules (database, mail, CV extraction,
+This application integrates all processing modules (database, mail, CV extraction,
 veracity checking, matching, and response generation) into an interactive
-conversational agent.
+conversational agent. It provides a secure, UI-based interface for HR staff
+to review candidate matches, verify processing status, and send communications
+directly through the system.
 """
 
 import chainlit as cl
@@ -248,6 +250,18 @@ agent_prompt = PromptTemplate.from_template(react_prompt_template)
 def verify_hr_credentials(username: str, password: str):
     """
     Verify HR credentials against the database and return user metadata.
+
+    Authenticates the provided username and password by querying the `hr_users`
+    table and verifying the stored bcrypt hash. On success, returns a Chainlit
+    User object containing profile details for session context.
+
+    Args:
+        username: The HR staff member's login username.
+        password: The plaintext password provided during authentication.
+
+    Returns:
+        cl.User: A Chainlit User object with HR profile metadata if authentication succeeds.
+        None: If the username is not found or the password is incorrect.
     """
     db.connect()
     with db._connection.cursor() as cursor:
@@ -278,7 +292,14 @@ def verify_hr_credentials(username: str, password: str):
 
 @cl.on_chat_start
 async def initialize_chat_session():
-    """Triggered when a user opens the Chainlit interface."""
+    """
+    Initialize the chat session when a user connects to the Chainlit interface.
+
+    Retrieves the authenticated user's details to generate a personalized
+    email signature block. Sets up the ReAct agent, initializes conversational
+    memory, and creates the AgentExecutor. Stores these components in the
+    user session for subsequent message handling and sends a welcome message.
+    """
 
     # Retrieve the logged-in user and build the signature block
     current_user = cl.user_session.get("user")
@@ -325,7 +346,16 @@ async def initialize_chat_session():
 
 @cl.on_message
 async def handle_user_message(message: cl.Message):
-    """Process incoming user message."""
+    """
+    Process an incoming user message through the AI agent.
+
+    Retrieves the agent executor and HR signature from the active session,
+    invokes the agent with the user's input, and returns the generated
+    response to the Chainlit UI.
+
+    Args:
+        message: The Chainlit message object containing the user's input text.
+    """
 
     current_agent_executor = cl.user_session.get("agent_executor")
     current_hr_signature = cl.user_session.get("hr_signature")

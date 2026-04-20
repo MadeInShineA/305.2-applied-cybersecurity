@@ -97,8 +97,8 @@ class Orchestrator:
         # Initialize database and set up schema
         self.db = Database(self.config)
         self.db.connect()
-        # Drop existing tables and create fresh schema
-        self.db.drop_tables()
+
+        # Make sure the needed tables exist
         self.db.ensure_tables()
 
         # Initialize email client

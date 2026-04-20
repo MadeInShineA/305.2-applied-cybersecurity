@@ -2,7 +2,8 @@
 Database module for the email agent application.
 
 This module provides the Database class which manages all database connections
-and operations for storing email processing data and job application records.
+and operations for storing email processing data, job application records,
+job offer matches, HR responses, and HR user accounts.
 It uses PyMySQL to connect to a MySQL database and provides methods for
 creating, reading, and updating data across multiple tables.
 """
@@ -21,13 +22,15 @@ class Database:
 
     This class provides a centralized interface for all database operations
     in the email agent application. It handles connection management, table
-    creation, and CRUD operations for emails, job applications, and job
-    offer matches.
+    creation, and CRUD operations for emails, job applications, job
+    offer matches, HR responses, and HR users.
 
-    The database schema includes three main tables:
+    The database schema includes five main tables:
         - emails: Tracks processed emails to avoid duplicate processing
         - job_applications: Stores information about detected job applications
         - job_offer_matches: Stores CV-to-job-offer matching results
+        - hr_responses: Tracks HR communication with candidates
+        - hr_users: Stores HR staff authentication and profile data
 
     Attributes:
         config: Configuration object containing database credentials and settings.
@@ -96,10 +99,12 @@ class Database:
         """
         Create database tables if they don't exist.
 
-        This method creates three tables necessary for the email agent:
+        This method creates five tables necessary for the email agent:
         1. emails - stores processed email IDs to prevent duplicate processing
         2. job_applications - stores job application metadata
         3. job_offer_matches - stores CV-to-job-offer matching results
+        4. hr_responses - stores HR outreach records
+        5. hr_users - stores HR staff credentials and profiles
 
         Each table is created with appropriate constraints and indexes
         for efficient querying. Foreign key relationships maintain data
@@ -119,7 +124,6 @@ class Database:
                     received_at TIMESTAMP NULL,
                     subject VARCHAR(255),
                     body VARCHAR(255)
-
                 )
             """)
 
@@ -188,8 +192,8 @@ class Database:
         Drop all database tables.
 
         WARNING: This method permanently deletes all data from the database.
-        It drops tables in reverse order of dependencies (job_offer_matches,
-        job_applications, emails) to respect foreign key constraints.
+        It drops tables in an order that respects foreign key dependencies
+        (hr_responses, job_offer_matches, job_applications, emails, hr_users).
 
         This method is primarily used during development or testing to
         reset the database to a clean state.
@@ -241,11 +245,13 @@ class Database:
 
         This method inserts a new record into the emails table to track that
         an email has been processed. The record includes the email's unique
-        identifier and the timestamp when it was received.
+        identifier, receipt timestamp, subject, and body.
 
         Args:
             email_id: The unique identifier of the email (Message-ID header).
             received_at: The timestamp when the email was received (UTC format).
+            email_subject: The subject line of the email.
+            email_body: The text content of the email.
 
         Note:
             This method automatically connects to the database if not already connected.
@@ -271,12 +277,13 @@ class Database:
         Save a job application entry to the database.
 
         This method stores information about a detected job application in the
-        job_applications table. It records the email ID, sender's email address,
-        and email subject for future reference and analysis.
+        job_applications table. It records the email ID, candidate's email address,
+        and candidate's name for future reference and analysis.
 
         Args:
             email_id: The unique identifier of the original email.
             candidate_email: The email address of the job applicant.
+            candidate_name: The full name of the job applicant.
 
         Returns:
             bool: True if the job application was saved successfully, False if
@@ -376,11 +383,18 @@ class Database:
         """
         Retrieve candidate/job offer matches from the database.
 
+        Fetches joined data from job_offer_matches, job_applications, emails,
+        and hr_responses to provide a comprehensive view of each match.
+
         Args:
             limit: Maximum number of records to return (default 10).
 
         Returns:
-            List of dictionaries containing match information.
+            List[Dict[str, Any]]: A list of dictionaries containing match
+            information, including candidate details, match scores, and HR status.
+
+        Note:
+            This method automatically connects to the database if not already connected.
         """
         if not self._connection:
             self.connect()
@@ -422,7 +436,11 @@ class Database:
             match_id: The ID of the job_offer_matches record.
 
         Returns:
-            bool: True if HR has already sent a response, False otherwise.
+            bool: True if HR has already sent a response (hr_email_sent = TRUE),
+                  False otherwise.
+
+        Note:
+            This method automatically connects to the database if not already connected.
         """
         if not self._connection:
             self.connect()
@@ -449,13 +467,27 @@ class Database:
         """
         Record an HR response to a candidate/job match.
 
+        Inserts a new record into the hr_responses table to log outreach
+        attempts or communications sent to a candidate regarding a job match.
+
         Args:
             match_id: The ID of the job_offer_matches record.
             candidate_email: The email address of the candidate.
             offer_name: The name of the job offer.
+            email_subject: The subject line of the HR email.
+            email_body: The content of the HR email.
 
         Returns:
             bool: True if the response was saved successfully.
+
+        Raises:
+            Exception: If a database error occurs during insertion.
+
+        Note:
+            This method automatically connects to the database if not already connected.
+            Note: This method does not automatically set hr_email_sent to TRUE.
+                  If that flag is used for tracking, ensure it's updated elsewhere
+                  or modify this method to set it upon insertion.
         """
         if not self._connection:
             self.connect()
