@@ -4,3 +4,5 @@
 *__pycache__
 assets/
 .chainlit/
+.ruff_cache
+kdrive_cache

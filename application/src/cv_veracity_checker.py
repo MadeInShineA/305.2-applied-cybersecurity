@@ -133,7 +133,8 @@ class CvVeracityChecker:
             2. Use the search tool to cross-reference these claims. Run targeted queries.
             3. Evaluate public evidence, consistency, and plausibility.
             4. Ignore personal/private details (phone, email, salary, home address).
-            5. Score the CV from 0 to 100:
+            5. Avoid linkedin and wikipedia because they have good antibot measures.
+            6. Score the CV from 0 to 100:
             - 0-20: Highly suspicious / likely fabricated
             - 21-40: Major inconsistencies / mostly unverifiable
             - 41-60: Moderate issues / mixed evidence

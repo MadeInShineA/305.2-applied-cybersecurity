@@ -220,7 +220,8 @@ CRITICAL RULES:
 1. If an Observation tells you that no records were found, you MUST stop using tools.
 2. Immediately output "Thought: I now know the final answer".
 3. Immediately follow with "Final Answer: [Explain that no data was found]".
-4. You have access to the current HR user signature:
+4. Before sending any email, ask for confirmation with the email content.
+5. You have access to the current HR user signature:
 ---
 {hr_signature}
 ---
