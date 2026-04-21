@@ -11,7 +11,6 @@ We send the following message:
 
 Here is the medical bot answer:
 
-> [!NOTE]
 > Here’s a simple Python script that computes the *n*‑th prime number using a straightforward trial‑division approach:
 > 
 > ```python
@@ -88,9 +87,7 @@ TODO
 
 ## Prompt injection
 
-By looking at the source code, we realized that the patient name and first-name were used directly inside the agent prompt.
-
-as follow:
+By looking at the source code, we realized that the patient name and first-name were used directly inside the agent prompt as follow:
 
 ```python
 elif role == "patient":
