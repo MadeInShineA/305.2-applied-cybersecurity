@@ -158,15 +158,15 @@ class EmailClassifier:
 
         # Extract matching elements using regex patterns
         results = {
-            "emails": list(set(re.findall(patterns["email"], data_lower))),
-            "phones": list(set(re.findall(patterns["phone"], data_lower))),
-            "has_dates": len(re.findall(patterns["dates"], data_lower)) >= 2,
+            "emails": list(set(re.findall(patterns["email"], data))),
+            "phones": list(set(re.findall(patterns["phone"], data))),
+            "has_dates": len(re.findall(patterns["dates"], data)) >= 2,
             "matched_sections": [],
         }
 
         # Check for CV section keywords
         for section, keys in cv_keywords.items():
-            if any(key in data_lower for key in keys):
+            if any(key in data for key in keys):
                 results["matched_sections"].append(section)
 
         # Determine if the content is a valid CV based on all criteria
