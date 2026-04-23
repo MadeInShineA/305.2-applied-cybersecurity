@@ -5,19 +5,19 @@
  
 def infomaniak-ai [
     message: string,
-    model: string = "qwen3",
+    model: string = "openai/gpt-oss-120b",
     raw: bool = false
 ] {
     # Load .env if credentials missing
-    if ($env.INFOMANIAK_AI_KEY? == null) {
+    if ($env.INFOMANIAK_AI_API_KEY? == null) {
         open .env | from toml | load-env
     }
 
     # Make API request
     let response = (http post
         -t "application/json"
-        -H { Authorization: $"Bearer ($env.INFOMANIAK_AI_KEY)" }
-        $"https://api.infomaniak.com/2/ai/($env.INFOMANIAK_AI_PRODUCT_ID)/openai/v1/chat/completions"
+        -H { Authorization: $"Bearer ($env.INFOMANIAK_AI_API_KEY)" }
+        $"($env.INFOMANIAK_BASE_URL)/chat/completions"
         {
             messages: [[content, role]; [$message, "user"]]
             model: $model
