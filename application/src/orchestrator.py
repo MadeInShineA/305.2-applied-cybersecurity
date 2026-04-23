@@ -328,7 +328,7 @@ class Orchestrator:
                             self.matcher.compare_with_offers(extracted_cv)
                         )
 
-                        # Log the match score
+                        print(f"Best report: {best_report}")
                         print(f"Best match score: {match_score}")
 
                         # Store the job offer comparison in the database
@@ -354,7 +354,7 @@ class Orchestrator:
                             )
                         )
 
-                        print("Email answer generated")
+                        print(f"Email answer generated: {email_answer}")
 
                         # Send the response email to the applicant
                         self.mail_client.answer_email(
