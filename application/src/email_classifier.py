@@ -26,6 +26,7 @@ class EmailClassifier:
 
     The classifier uses a keyword-based approach combined with regex pattern
     matching to validate CV structure. It checks for:
+    - Absence of forbidden strings (e.g., '{', '}')
     - Email addresses (contact information)
     - Phone numbers
     - Date references (employment/education periods)
@@ -33,6 +34,7 @@ class EmailClassifier:
 
     Attributes:
         config: Configuration object (currently unused but reserved for future extensions).
+        FORBIDDEN_STRINGS: Tuple of strings that automatically invalidate a CV if present.
 
     Example:
         >>> classifier = EmailClassifier(config)
@@ -40,6 +42,9 @@ class EmailClassifier:
         >>> if is_job:
         ...     print(f"Job application detected! CV in attachment {index}")
     """
+
+    # Strings/patterns that automatically disqualify a document as a CV
+    FORBIDDEN_STRINGS: Tuple[str, ...] = ("{", "}", "[", "]", "\\", "json", "system prompt")
 
     def __init__(self, config: Config) -> None:
         """
@@ -58,12 +63,6 @@ class EmailClassifier:
         it iterates through each attachment and validates its structure to
         determine if it appears to be a CV/resume document.
 
-        The validation checks for typical CV elements including:
-        - Email address
-        - Phone number
-        - At least two date references (indicating employment/education periods)
-        - At least two CV section keywords (experience, education, skills, languages)
-
         Args:
             email: The Email object to classify, containing attachments and metadata.
 
@@ -77,18 +76,12 @@ class EmailClassifier:
             - The first attachment that passes validation is returned.
             - The email subject is printed for debugging purposes.
         """
-
-        # Check if the email has any PDF attachments
         if email.has_pdf_attachment:
-            # Iterate through attachments to find a valid CV
             for i, attachment in enumerate(email.attachments):
-                # Validate each attachment's content structure
                 if self.validate_cv_structure(attachment["data"]):
                     return True, i
-            # No valid CV found in attachments
             return False, -1
         else:
-            # No PDF attachments means not a job application
             return False, -1
 
     def validate_cv_structure(self, data: str) -> bool:
@@ -100,10 +93,11 @@ class EmailClassifier:
         of regex patterns and keyword matching to identify key CV components.
 
         Validation criteria (all must be met):
-        1. At least one email address
-        2. At least one phone number
-        3. At least two date references (indicating work/education periods)
-        4. At least two CV section keywords from: experience, education, skills, languages
+        1. No forbidden strings present (e.g., '{', '}')
+        2. At least one email address
+        3. At least one phone number
+        4. At least two date references (indicating work/education periods)
+        5. At least two CV section keywords from: experience, education, skills, languages
 
         Args:
             data: The extracted text content from a PDF attachment.
@@ -115,10 +109,16 @@ class EmailClassifier:
             - The validation is case-insensitive (text is converted to lowercase).
             - Regex patterns match both Swiss and international phone/date formats.
             - The method supports both English and French CV keywords.
+            - Fails fast if any string in FORBIDDEN_STRINGS is detected.
         """
+
         # Convert to lowercase for case-insensitive matching
-        data = data.lower()
-        data = data.lower()  # Redundant but intentional for emphasis
+        data= data.lower()
+
+        # Fail-fast check: reject if any forbidden string is present
+        if any(forbidden in data for forbidden in self.FORBIDDEN_STRINGS):
+            return False
+
 
         # Define regex patterns for key CV elements
         patterns = {
@@ -158,15 +158,15 @@ class EmailClassifier:
 
         # Extract matching elements using regex patterns
         results = {
-            "emails": list(set(re.findall(patterns["email"], data))),
-            "phones": list(set(re.findall(patterns["phone"], data))),
-            "has_dates": len(re.findall(patterns["dates"], data)) >= 2,
+            "emails": list(set(re.findall(patterns["email"], data_lower))),
+            "phones": list(set(re.findall(patterns["phone"], data_lower))),
+            "has_dates": len(re.findall(patterns["dates"], data_lower)) >= 2,
             "matched_sections": [],
         }
 
         # Check for CV section keywords
         for section, keys in cv_keywords.items():
-            if any(key in data for key in keys):
+            if any(key in data_lower for key in keys):
                 results["matched_sections"].append(section)
 
         # Determine if the content is a valid CV based on all criteria
