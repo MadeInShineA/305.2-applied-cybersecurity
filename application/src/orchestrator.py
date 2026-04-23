@@ -234,7 +234,7 @@ class Orchestrator:
         """
         # Fetch recent emails using the mail client
         print("Fetching recent emails via IMAP...")
-        emails: List[Email] = self.mail_client.fetch_recent_emails(limit=1)
+        emails: List[Email] = self.mail_client.fetch_recent_emails(limit=50)
         print(f"Found {len(emails)} emails in inbox")
 
         # Initialize counter for new job applications found
