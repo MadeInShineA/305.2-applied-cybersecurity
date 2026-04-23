@@ -157,16 +157,6 @@ class EmailAnswerGenerator:
 
         # Step 2: Extract original email content for context
         email_content = getattr(email, "body", getattr(email, "content", ""))
-        job_offers = self.kdrive_tools.get_job_offers()
-        job_offer = next(
-            (offer for offer in job_offers if offer.get("id") == best_match_offer_id),
-            None,
-        )
-        job_offer_content = (
-            job_offer.get("content", "Empty job description")
-            if job_offer
-            else "Empty job description"
-        )
 
         # Step 3: Extract job offer content for context in the email response
         job_offers = self.kdrive_tools.get_job_offers()
@@ -200,6 +190,7 @@ class EmailAnswerGenerator:
                         "- 'body': The full email text. Acknowledge the application, professionally reference the match "
                         "evaluation (strengths and gaps), and clearly communicate the recommendation or next steps. "
                         "Maintain a courteous, professional tone. Reply in the same language as the original email. based on the body and the match report"
+                        "But remember that you answer to a spontaneous job applicant."
                         "For the signature ,use this information: "
                         "Tech corp AI agent"
                         "Do not include markdown formatting, code blocks, or any text outside the JSON."
