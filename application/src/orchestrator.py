@@ -19,6 +19,7 @@ The class handles graceful shutdown via signal handlers (SIGINT, SIGTERM)
 and ensures proper cleanup of resources on exit.
 """
 
+import json
 import signal
 import time
 from typing import List
@@ -120,7 +121,9 @@ class Orchestrator:
         self.matcher = ApplicationMatcher(self.config, self.kdrive_tools)
 
         # Initialize email answer generator for response creation
-        self.email_answer_generator = EmailAnswerGenerator(self.config)
+        self.email_answer_generator = EmailAnswerGenerator(
+            self.config, self.kdrive_tools
+        )
 
         # Initialize running state flag
         self.running = False
@@ -231,7 +234,7 @@ class Orchestrator:
         """
         # Fetch recent emails using the mail client
         print("Fetching recent emails via IMAP...")
-        emails: List[Email] = self.mail_client.fetch_recent_emails(limit=50)
+        emails: List[Email] = self.mail_client.fetch_recent_emails(limit=1)
         print(f"Found {len(emails)} emails in inbox")
 
         # Initialize counter for new job applications found
@@ -342,7 +345,12 @@ class Orchestrator:
                         # Generate a professional email response
                         email_answer: EmailAnswer = (
                             self.email_answer_generator.generate_email_answer(
-                                email, candidate_name, best_report
+                                email,
+                                candidate_name,
+                                best_report.get("strengths", []),
+                                best_report.get("weaknesses", []),
+                                best_report.get("recommendation", ""),
+                                best_match_offer.get("id", ""),
                             )
                         )
 
