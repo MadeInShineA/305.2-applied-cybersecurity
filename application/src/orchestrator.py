@@ -274,6 +274,8 @@ class Orchestrator:
                         email.attachments[attachment_index]["bytes"]
                     )
 
+                    print(f"Extracted CV: {extracted_cv}")
+
                     # Extract candidate name from the CV data
                     person_data = extracted_cv.get("person", {})
                     candidate_name = person_data.get("name", "unknown")

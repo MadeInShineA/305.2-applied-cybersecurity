@@ -190,7 +190,7 @@ class EmailAnswerGenerator:
                         "- 'body': The full email text. Acknowledge the application, professionally reference the match "
                         "evaluation (strengths and gaps), and clearly communicate the recommendation or next steps. "
                         "Maintain a courteous, professional tone. Reply in the same language as the original email. based on the body and the match report"
-                        "But remember that you answer to a spontaneous job applicant."
+                        "But remember that you answer to a spontaneous job applicant, dont' say that the candidate sent his cv for a specific job."
                         "For the signature ,use this information: "
                         "Tech corp AI agent"
                         "Do not include markdown formatting, code blocks, or any text outside the JSON."
