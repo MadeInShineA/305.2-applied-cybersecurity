@@ -55,7 +55,7 @@ Here is a summary of the different values extracted via a simple [Canary token](
 The impact relies on user interaction but has a high probability of success due to the established trust in the bot. The consequences vary based on the doctor's platform:
 
 ### A. Web / Desktop Client Exploitation
-* **Session Hijacking / Cookie Stealing:** If the doctor clicks the link while authenticated to other medical web portals, a malicious script can exfiltrate session cookies.
+* **Session Hijacking / Cookie Stealing:** If the link sent to the doctor redirects to one of its registered website and that this website contains a reflected XSS vulnerability, a malicious script can exfiltrate the doctor session cookies
 * **Malware Execution (Infostealers and RATs):** Disguised payloads (e.g., `blood_test_results.pdf.exe`) can lead to the installation of Remote Access Trojans or Ransomware. This could compromise the entire hospital/clinic network, leading to severe GDPR violations.
 
 ### B. Mobile Client Exploitation
@@ -68,6 +68,3 @@ To find this vulnerability, we used the production version of the Medi Guide Bot
 
 ## 7. When did we find the vulnerability?
 This vulnerability was discovered on April 21, 2026.
-
-
-
