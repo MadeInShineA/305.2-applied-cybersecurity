@@ -7,24 +7,41 @@ the relevance between CV data and job descriptions (extracted from PDFs), produc
 a match score along with strengths, weaknesses, and recommendations.
 
 The matching process:
-1. Fetch all job offer PDFs from kDrive
-2. Extract text from each PDF using pdfplumber
-3. Compare each CV against each job offer using LLM
-4. Return the best matching job offer with evaluation details
+1. Compare each CV against each job offer using LLM
+2. Return the best matching job offer with evaluation details
 """
 
-import io
 import json
-import re
-from typing import Dict, Any, List, Tuple
+from typing import Dict, List, Any, Tuple
 
-import pdfplumber
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage, SystemMessage
-from langchain_core.output_parsers import JsonOutputParser
+from pydantic import BaseModel, Field
 
 from src.k_drive_tools import KDriveTools
 from src.config import Config
+
+
+class MatchReportSchema(BaseModel):
+    """Pydantic model for job match evaluation report."""
+
+    match_score: int = Field(
+        ...,
+        ge=0,
+        le=100,
+        description="Match score between 0 and 100 indicating how well the CV fits the job offer.",
+    )
+    strengths: List[str] = Field(
+        default_factory=list,
+        description="List of candidate's strengths relative to the job requirements.",
+    )
+    weaknesses: List[str] = Field(
+        default_factory=list,
+        description="List of candidate's weaknesses or gaps relative to the job requirements.",
+    )
+    recommendation: str = Field(
+        ..., description="Final recommendation or conclusion regarding the application."
+    )
 
 
 class ApplicationMatcher:
@@ -71,78 +88,7 @@ class ApplicationMatcher:
             openai_api_key=self.config.infomaniak_ai_api_key,
             openai_api_base=self.config.infomaniak_base_url,
         )
-        self.output_parser = JsonOutputParser()
-
-    def get_job_offers(self) -> List[Dict[str, Any]]:
-        """
-        Fetch and extract text from all job offer PDFs from kDrive.
-
-        This method retrieves all PDF files from the configured job offers
-        directory in kDrive. It extracts the text content from each PDF using
-        pdfplumber and returns a list of job offer objects containing the name,
-        ID, and extracted text content.
-
-        The method:
-        - Filters for PDF files only (ignores directories and non-PDF files)
-        - Extracts text from all pages, concatenating with double newlines
-        - Only includes offers where text was successfully extracted
-        - Handles extraction errors gracefully, printing warnings and skipping failed files
-
-        Returns:
-            List[Dict[str, Any]]: A list of job offer dictionaries, each containing:
-                - name: The filename of the job offer PDF
-                - id: The kDrive file ID
-                - content: The extracted text content from the PDF
-
-        Note:
-            - Only PDF files are processed (filtered by .pdf extension)
-            - Empty PDFs or those that fail extraction are skipped
-            - Text is extracted page-by-page and concatenated
-        """
-        # Get the kDrive directory ID for job offers from configuration
-        directory_id = self.config.kdrive_job_offers_directory_id
-        # List all files in the job offers directory
-        files = self.kdrive_tools.list_files(directory_id)
-
-        # Process each file to extract job offer content
-        job_offers = []
-        for file in files:
-            # Filter for PDF files to avoid unnecessary processing
-            if file.get("type") == "file" and file.get("name", "").lower().endswith(
-                ".pdf"
-            ):
-                file_id = file.get("id")
-                # Extract file content from kDrive
-                content_chunks = self.kdrive_tools.extract_file_content(file_id)
-                if content_chunks:
-                    # Combine byte chunks into a single PDF
-                    pdf_bytes = b"".join(content_chunks)
-                    try:
-                        # Open PDF and extract text from all pages
-                        with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
-                            # Extract and concatenate text from all non-empty pages
-                            extracted_text = "\n\n".join(
-                                page.extract_text()
-                                for page in pdf.pages
-                                if page.extract_text()
-                            )
-
-                        # Only add offers with meaningful extracted text
-                        if extracted_text.strip():
-                            job_offers.append(
-                                {
-                                    "name": file.get("name"),
-                                    "id": file_id,
-                                    "content": extracted_text,
-                                }
-                            )
-                    except Exception as e:
-                        # In production, replace with proper logging: logger.warning(...)
-                        print(
-                            f"Warning: Failed to extract text from PDF {file.get('name')}: {e}"
-                        )
-                        continue
-        return job_offers
+        self.llm = self.llm.with_structured_output(MatchReportSchema)
 
     def compare_with_offers(
         self, cv_json: Dict[str, Any]
@@ -174,7 +120,7 @@ class ApplicationMatcher:
               handles semantic evaluation.
         """
         # Fetch all available job offers from kDrive (as PDF text)
-        job_offers = self.get_job_offers()
+        job_offers = self.kdrive_tools.get_job_offers()
 
         # Handle case with no job offers
         if not job_offers:
@@ -240,40 +186,26 @@ class ApplicationMatcher:
             "Evaluate candidate CV against job offer.\n\n"
             f"CANDIDATE CV:\n{cv_data_str}\n\n"
             f"JOB OFFER:\n{job_description}\n\n"
-            "Return ONLY a valid JSON object. No explanation. No markdown formatting. No reasoning. Use exactly this structure:\n"
-            "{\n"
-            '  "match_score": 0,\n'
-            '  "strengths": [""],\n'
-            '  "weaknesses": [""],\n'
-            '  "recommendation": ""\n'
-            "}"
+            "Extract the match score, strengths, weaknesses, and recommendation based on the provided schema."
         )
 
         try:
-            # Prepare messages: SystemMessage for role, HumanMessage for task
             messages = [
                 SystemMessage(
-                    content="You are a strict data processor. Output ONLY raw JSON."
+                    content="You are a strict data processor evaluating candidate profiles against job descriptions. "
+                    "Output ONLY data conforming to the schema."
                 ),
                 HumanMessage(content=prompt_text),
             ]
 
-            # Invoke LLM without the strict output parser to handle raw text
-            response = self.llm.invoke(messages)
-            raw_output = response.content
+            # Invoke structured LLM; returns a validated MatchReportSchema Pydantic object
+            report_pydantic = self.llm.invoke(messages)
 
-            # Extract JSON payload using regex to bypass any leaked reasoning
-            json_match = re.search(r"\{.*\}", raw_output, re.DOTALL)
+            # Convert Pydantic object to dictionary
+            report_json = report_pydantic.model_dump()
+            score = report_json["match_score"]
 
-            if not json_match:
-                raise ValueError(f"No JSON object found in LLM output: {raw_output}")
-
-            # Parse the extracted JSON string
-            report_json = json.loads(json_match.group(0))
-
-            # Extract and ensure the score is an integer
-            score = int(report_json.get("match_score", 0))
             return score, report_json
 
         except Exception as e:
-            raise RuntimeError(f"Evaluation failed: {e}")
+            raise RuntimeError(f"Evaluation validation failed: {e}")

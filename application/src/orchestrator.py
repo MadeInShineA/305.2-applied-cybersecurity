@@ -19,6 +19,7 @@ The class handles graceful shutdown via signal handlers (SIGINT, SIGTERM)
 and ensures proper cleanup of resources on exit.
 """
 
+import json
 import signal
 import time
 from typing import List
@@ -120,7 +121,9 @@ class Orchestrator:
         self.matcher = ApplicationMatcher(self.config, self.kdrive_tools)
 
         # Initialize email answer generator for response creation
-        self.email_answer_generator = EmailAnswerGenerator(self.config)
+        self.email_answer_generator = EmailAnswerGenerator(
+            self.config, self.kdrive_tools
+        )
 
         # Initialize running state flag
         self.running = False
@@ -271,6 +274,8 @@ class Orchestrator:
                         email.attachments[attachment_index]["bytes"]
                     )
 
+                    print(f"Extracted CV: {extracted_cv}")
+
                     # Extract candidate name from the CV data
                     person_data = extracted_cv.get("person", {})
                     candidate_name = person_data.get("name", "unknown")
@@ -325,7 +330,7 @@ class Orchestrator:
                             self.matcher.compare_with_offers(extracted_cv)
                         )
 
-                        # Log the match score
+                        print(f"Best report: {best_report}")
                         print(f"Best match score: {match_score}")
 
                         # Store the job offer comparison in the database
@@ -342,11 +347,16 @@ class Orchestrator:
                         # Generate a professional email response
                         email_answer: EmailAnswer = (
                             self.email_answer_generator.generate_email_answer(
-                                email, candidate_name, best_report
+                                email,
+                                candidate_name,
+                                best_report.get("strengths", []),
+                                best_report.get("weaknesses", []),
+                                best_report.get("recommendation", ""),
+                                best_match_offer.get("id", ""),
                             )
                         )
 
-                        print("Email answer generated")
+                        print(f"Email answer generated: {email_answer}")
 
                         # Send the response email to the applicant
                         self.mail_client.answer_email(

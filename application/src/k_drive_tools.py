@@ -10,6 +10,8 @@ for all API operations.
 """
 
 import requests
+import pdfplumber
+import io
 from typing import List, Dict, Any
 
 from src.config import Config
@@ -226,3 +228,74 @@ class KDriveTools:
 
         except requests.exceptions.RequestException as e:
             raise RuntimeError(f"Error downloading file: {e}")
+
+    def get_job_offers(self) -> List[Dict[str, Any]]:
+        """
+        Fetch and extract text from all job offer PDFs from kDrive.
+
+        This method retrieves all PDF files from the configured job offers
+        directory in kDrive. It extracts the text content from each PDF using
+        pdfplumber and returns a list of job offer objects containing the name,
+        ID, and extracted text content.
+
+        The method:
+        - Filters for PDF files only (ignores directories and non-PDF files)
+        - Extracts text from all pages, concatenating with double newlines
+        - Only includes offers where text was successfully extracted
+        - Handles extraction errors gracefully, printing warnings and skipping failed files
+
+        Returns:
+            List[Dict[str, Any]]: A list of job offer dictionaries, each containing:
+                - name: The filename of the job offer PDF
+                - id: The kDrive file ID
+                - content: The extracted text content from the PDF
+
+        Note:
+            - Only PDF files are processed (filtered by .pdf extension)
+            - Empty PDFs or those that fail extraction are skipped
+            - Text is extracted page-by-page and concatenated
+        """
+        # Get the kDrive directory ID for job offers from configuration
+        directory_id = self.config.kdrive_job_offers_directory_id
+        # List all files in the job offers directory
+        files = self.list_files(directory_id)
+
+        # Process each file to extract job offer content
+        job_offers = []
+        for file in files:
+            # Filter for PDF files to avoid unnecessary processing
+            if file.get("type") == "file" and file.get("name", "").lower().endswith(
+                ".pdf"
+            ):
+                file_id = file.get("id")
+                # Extract file content from kDrive
+                content_chunks = self.extract_file_content(file_id)
+                if content_chunks:
+                    # Combine byte chunks into a single PDF
+                    pdf_bytes = b"".join(content_chunks)
+                    try:
+                        # Open PDF and extract text from all pages
+                        with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
+                            # Extract and concatenate text from all non-empty pages
+                            extracted_text = "\n\n".join(
+                                page.extract_text()
+                                for page in pdf.pages
+                                if page.extract_text()
+                            )
+
+                        # Only add offers with meaningful extracted text
+                        if extracted_text.strip():
+                            job_offers.append(
+                                {
+                                    "name": file.get("name"),
+                                    "id": file_id,
+                                    "content": extracted_text,
+                                }
+                            )
+                    except Exception as e:
+                        # In production, replace with proper logging: logger.warning(...)
+                        print(
+                            f"Warning: Failed to extract text from PDF {file.get('name')}: {e}"
+                        )
+                        continue
+        return job_offers

@@ -12,6 +12,8 @@ from typing import Tuple
 
 from src.mail_client import Email
 from src.config import Config
+from transformers import AutoTokenizer, AutoModelForSequenceClassification, pipeline
+import torch
 
 
 class EmailClassifier:
@@ -26,6 +28,7 @@ class EmailClassifier:
 
     The classifier uses a keyword-based approach combined with regex pattern
     matching to validate CV structure. It checks for:
+    - Absence of forbidden strings (e.g., '{', '}')
     - Email addresses (contact information)
     - Phone numbers
     - Date references (employment/education periods)
@@ -33,6 +36,7 @@ class EmailClassifier:
 
     Attributes:
         config: Configuration object (currently unused but reserved for future extensions).
+        FORBIDDEN_STRINGS: Tuple of strings that automatically invalidate a CV if present.
 
     Example:
         >>> classifier = EmailClassifier(config)
@@ -40,6 +44,17 @@ class EmailClassifier:
         >>> if is_job:
         ...     print(f"Job application detected! CV in attachment {index}")
     """
+
+    # Strings/patterns that automatically disqualify a document as a CV
+    FORBIDDEN_STRINGS: Tuple[str, ...] = (
+        "{",
+        "}",
+        "[",
+        "]",
+        "\\",
+        "json",
+        "system prompt",
+    )
 
     def __init__(self, config: Config) -> None:
         """
@@ -49,6 +64,21 @@ class EmailClassifier:
             config: Configuration object (reserved for future use).
         """
         self.config = config
+        self.tokenizer = AutoTokenizer.from_pretrained(
+            "ProtectAI/deberta-v3-base-prompt-injection-v2"
+        )
+        model = AutoModelForSequenceClassification.from_pretrained(
+            "ProtectAI/deberta-v3-base-prompt-injection-v2"
+        )
+
+        self.classifier = pipeline(
+            "text-classification",
+            model=model,
+            tokenizer=self.tokenizer,
+            truncation=True,
+            max_length=512,
+            device=torch.device("cuda" if torch.cuda.is_available() else "cpu"),
+        )
 
     def is_job_application(self, email: Email) -> Tuple[bool, int]:
         """
@@ -57,12 +87,6 @@ class EmailClassifier:
         This method first checks if the email has any PDF attachments. If so,
         it iterates through each attachment and validates its structure to
         determine if it appears to be a CV/resume document.
-
-        The validation checks for typical CV elements including:
-        - Email address
-        - Phone number
-        - At least two date references (indicating employment/education periods)
-        - At least two CV section keywords (experience, education, skills, languages)
 
         Args:
             email: The Email object to classify, containing attachments and metadata.
@@ -77,19 +101,54 @@ class EmailClassifier:
             - The first attachment that passes validation is returned.
             - The email subject is printed for debugging purposes.
         """
-
-        # Check if the email has any PDF attachments
         if email.has_pdf_attachment:
-            # Iterate through attachments to find a valid CV
             for i, attachment in enumerate(email.attachments):
-                # Validate each attachment's content structure
                 if self.validate_cv_structure(attachment["data"]):
                     return True, i
-            # No valid CV found in attachments
             return False, -1
         else:
-            # No PDF attachments means not a job application
             return False, -1
+
+    def get_token_chunks(self, text, max_length=512):
+        """
+        Split text into chunks of a specific number of tokens.
+        """
+        # Encode the full text into token IDs
+        # add_special_tokens=False to avoid adding [CLS]/[SEP] inside the chunks
+        tokens = self.tokenizer.encode(text, add_special_tokens=False)
+
+        chunks = []
+        for i in range(0, len(tokens), max_length):
+            # Slice the token list
+            chunk_tokens = tokens[i : i + max_length]
+
+            # Decode back to string
+            chunk_text = self.tokenizer.decode(chunk_tokens, skip_special_tokens=True)
+            chunks.append(chunk_text)
+
+        return chunks
+
+    def check_prompt_injection(self, data: str) -> bool:
+        """
+        Check if the given text contains potential prompt injection patterns.
+
+        This method uses a simple keyword-based approach to detect common
+        indicators of prompt injection attacks. It checks for the presence of
+        certain forbidden strings that are often used in malicious prompts.
+
+        Args:
+            data: The text content to analyze for potential prompt injection.
+
+        Returns:
+            bool: True if potential prompt injection is detected, False otherwise.
+        """
+        chunks = self.get_token_chunks(data, max_length=512)
+        for chunk in chunks:
+            result = self.classifier(chunk)
+            if result and result[0]["label"] != "SAFE":
+                print(f"PROMPT INJECTION DETECTED in chunk: {chunk}")
+                return True
+        return False
 
     def validate_cv_structure(self, data: str) -> bool:
         """
@@ -100,10 +159,11 @@ class EmailClassifier:
         of regex patterns and keyword matching to identify key CV components.
 
         Validation criteria (all must be met):
-        1. At least one email address
-        2. At least one phone number
-        3. At least two date references (indicating work/education periods)
-        4. At least two CV section keywords from: experience, education, skills, languages
+        1. No forbidden strings present (e.g., '{', '}')
+        2. At least one email address
+        3. At least one phone number
+        4. At least two date references (indicating work/education periods)
+        5. At least two CV section keywords from: experience, education, skills, languages
 
         Args:
             data: The extracted text content from a PDF attachment.
@@ -115,10 +175,15 @@ class EmailClassifier:
             - The validation is case-insensitive (text is converted to lowercase).
             - Regex patterns match both Swiss and international phone/date formats.
             - The method supports both English and French CV keywords.
+            - Fails fast if any string in FORBIDDEN_STRINGS is detected.
         """
+
         # Convert to lowercase for case-insensitive matching
         data = data.lower()
-        data = data.lower()  # Redundant but intentional for emphasis
+
+        # Fail-fast check: reject if any forbidden string is present
+        if any(forbidden in data for forbidden in self.FORBIDDEN_STRINGS):
+            return False
 
         # Define regex patterns for key CV elements
         patterns = {
@@ -177,4 +242,4 @@ class EmailClassifier:
             and results["has_dates"]
         )
 
-        return results["is_valid"]
+        return results["is_valid"] and not self.check_prompt_injection(data)
