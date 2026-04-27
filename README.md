@@ -6,6 +6,7 @@ This repository contains the work of Team α for the 305.2 Applied Cybersecurity
 
 ```
 ├── application/    # Main email job application agent with HR chatbot interface
+├── demos/          # Demos for our presentation
 ├── docs/           # Documentation on LLM agent security
 └── reports/        # Bug reports and vulnerability findings
 ```
@@ -23,5 +24,6 @@ This project is an automated HR email agent system that:
 | Folder | Description |
 |--------|-------------|
 | [application/](application/) | Main application - email agent & HR chatbot |
+| [demos/](demos/) | Demos for our presentation |
 | [docs/](docs/) | Security documentation for LLM agents |
 | [reports/](reports/) | Bug reports and security findings |
