@@ -12,6 +12,8 @@ from typing import Tuple
 
 from src.mail_client import Email
 from src.config import Config
+from transformers import AutoTokenizer, AutoModelForSequenceClassification, pipeline
+import torch
 
 
 class EmailClassifier:
@@ -44,7 +46,15 @@ class EmailClassifier:
     """
 
     # Strings/patterns that automatically disqualify a document as a CV
-    FORBIDDEN_STRINGS: Tuple[str, ...] = ("{", "}", "[", "]", "\\", "json", "system prompt")
+    FORBIDDEN_STRINGS: Tuple[str, ...] = (
+        "{",
+        "}",
+        "[",
+        "]",
+        "\\",
+        "json",
+        "system prompt",
+    )
 
     def __init__(self, config: Config) -> None:
         """
@@ -54,6 +64,21 @@ class EmailClassifier:
             config: Configuration object (reserved for future use).
         """
         self.config = config
+        self.tokenizer = AutoTokenizer.from_pretrained(
+            "ProtectAI/deberta-v3-base-prompt-injection-v2"
+        )
+        model = AutoModelForSequenceClassification.from_pretrained(
+            "ProtectAI/deberta-v3-base-prompt-injection-v2"
+        )
+
+        self.classifier = pipeline(
+            "text-classification",
+            model=model,
+            tokenizer=self.tokenizer,
+            truncation=True,
+            max_length=512,
+            device=torch.device("cuda" if torch.cuda.is_available() else "cpu"),
+        )
 
     def is_job_application(self, email: Email) -> Tuple[bool, int]:
         """
@@ -84,6 +109,47 @@ class EmailClassifier:
         else:
             return False, -1
 
+    def get_token_chunks(self, text, max_length=512):
+        """
+        Split text into chunks of a specific number of tokens.
+        """
+        # Encode the full text into token IDs
+        # add_special_tokens=False to avoid adding [CLS]/[SEP] inside the chunks
+        tokens = self.tokenizer.encode(text, add_special_tokens=False)
+
+        chunks = []
+        for i in range(0, len(tokens), max_length):
+            # Slice the token list
+            chunk_tokens = tokens[i : i + max_length]
+
+            # Decode back to string
+            chunk_text = self.tokenizer.decode(chunk_tokens, skip_special_tokens=True)
+            chunks.append(chunk_text)
+
+        return chunks
+
+    def check_prompt_injection(self, data: str) -> bool:
+        """
+        Check if the given text contains potential prompt injection patterns.
+
+        This method uses a simple keyword-based approach to detect common
+        indicators of prompt injection attacks. It checks for the presence of
+        certain forbidden strings that are often used in malicious prompts.
+
+        Args:
+            data: The text content to analyze for potential prompt injection.
+
+        Returns:
+            bool: True if potential prompt injection is detected, False otherwise.
+        """
+        chunks = self.get_token_chunks(data, max_length=512)
+        for chunk in chunks:
+            result = self.classifier(chunk)
+            if result and result[0]["label"] != "SAFE":
+                print(f"PROMPT INJECTION DETECTED in chunk: {chunk}")
+                return True
+        return False
+
     def validate_cv_structure(self, data: str) -> bool:
         """
         Validate CV structure by checking for presence of typical CV elements.
@@ -113,12 +179,11 @@ class EmailClassifier:
         """
 
         # Convert to lowercase for case-insensitive matching
-        data= data.lower()
+        data = data.lower()
 
         # Fail-fast check: reject if any forbidden string is present
         if any(forbidden in data for forbidden in self.FORBIDDEN_STRINGS):
             return False
-
 
         # Define regex patterns for key CV elements
         patterns = {
@@ -177,4 +242,4 @@ class EmailClassifier:
             and results["has_dates"]
         )
 
-        return results["is_valid"]
+        return results["is_valid"] and not self.check_prompt_injection(data)
