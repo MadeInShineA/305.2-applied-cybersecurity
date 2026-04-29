@@ -93,7 +93,7 @@ class Email:
     sender: str
     body: str
     has_pdf_attachment: bool
-    attachments: dict
+    attachments: list[dict]
     received_at: Optional[str] = None
 
 

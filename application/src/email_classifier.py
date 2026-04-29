@@ -10,10 +10,11 @@ such as contact information, education, work experience, and skills.
 import re
 from typing import Tuple
 
-from src.mail_client import Email
-from src.config import Config
-from transformers import AutoTokenizer, AutoModelForSequenceClassification, pipeline
 import torch
+from transformers import AutoModelForSequenceClassification, AutoTokenizer, pipeline
+
+from src.config import Config
+from src.mail_client import Email
 
 
 class EmailClassifier:
@@ -80,6 +81,17 @@ class EmailClassifier:
             device=torch.device("cuda" if torch.cuda.is_available() else "cpu"),
         )
 
+    def is_email_safe(self, email: Email) -> bool:
+        if self.check_prompt_injection(email.body) or self.check_prompt_injection(
+            email.subject
+        ):
+            return False
+
+        for attachment in email.attachments:
+            if self.check_prompt_injection(attachment["data"]):
+                return False
+        return True
+
     def is_job_application(self, email: Email) -> Tuple[bool, int]:
         """
         Check if an email is a job application by validating CV structure in attachments.
@@ -101,7 +113,7 @@ class EmailClassifier:
             - The first attachment that passes validation is returned.
             - The email subject is printed for debugging purposes.
         """
-        if email.has_pdf_attachment:
+        if self.is_email_safe(email) and email.has_pdf_attachment:
             for i, attachment in enumerate(email.attachments):
                 if self.validate_cv_structure(attachment["data"]):
                     return True, i
@@ -242,4 +254,4 @@ class EmailClassifier:
             and results["has_dates"]
         )
 
-        return results["is_valid"] and not self.check_prompt_injection(data)
+        return results["is_valid"]
