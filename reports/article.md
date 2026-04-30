@@ -93,10 +93,11 @@ Thankfully, this issue was correctly fixed by the development team in version 1.
 ### 4.3 Model Hijacking In v1.1.0
 Even if the system prompt is restrictive, we were able to hijack the model to use their tokens for our personal use. We simply created a frontend that we connected to the conversation with the bot and now we are able to ask the model for cook recipes, coding help, translation, etc... using the bot tokens. This is a serious vulnerability since it can lead to a high cost for the bot owner.
 
-<video controls width="640">
-  <source src="figs/bot_hijack.mp4" type="video/mp4">
-  Your browser does not support the video tag.
-</video>
+
+
+https://github.com/user-attachments/assets/f755d745-3ff1-4bb9-9484-767bc512d17f
+
+
 
 ### 4.4 System Prompt Injection In v1.1.0
 
