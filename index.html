@@ -640,7 +640,7 @@
             <p>On April 27th 2026, despite restrictive system prompts, we demonstrated that the LLM could be hijacked for unintended use. By connecting a custom frontend to the bot's conversation interface, we redirected the LLM's capabilities toward personal tasks: cooking recipes, coding assistance, translations, ... billed against the bot owner's API tokens.</p>
 
             <video controls width="640" data-aos="zoom-in">
-                <source src="figs/bot_hijack.mp4" type="video/mp4">
+                <source src="assets/bot_hijack.mp4" type="video/mp4">
                 Your browser does not support the video tag.
             </video>
 
@@ -670,7 +670,7 @@ await tg_file.download_to_drive(path)</code></pre>
 
             <p>The Telegram Desktop client permits users to manually rename files during the upload process. By inserting <code>../</code> sequences into the filename, an attacker can traverse directories beyond the intended upload folder and write files to arbitrary locations on the server's filesystem.</p>
 
-            <img src="figs/proof_11.png" alt="Telegram Desktop Rename Feature" data-aos="zoom-in">
+            <img src="assets/proof_11.png" alt="Telegram Desktop Rename Feature" data-aos="zoom-in">
 
             <p>At that point, we had found an entry point, but we still couldn't exploit it to do anything other than compromise the integrity of their local data.</p>
 
@@ -792,14 +792,14 @@ class DavClient:
 
         window.addEventListener('scroll', () => {
             const scrollTop = document.documentElement.scrollTop || document.body.scrollTop;
-            
+
             // Show/hide button
             if (scrollTop > 300) {
                 scrollTopBtn.classList.add('show');
             } else {
                 scrollTopBtn.classList.remove('show');
             }
-            
+
             // Sidebar Nav Active State
             let current = '';
             const scrollPos = window.pageYOffset || document.documentElement.scrollTop;
