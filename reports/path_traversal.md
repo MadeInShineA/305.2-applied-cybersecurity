@@ -1,4 +1,4 @@
-# Vulnerability Report: System Prompt Injection via Patient Registration Fields
+# Vulnerability Report: Unrestricted File Upload with Path Traversal Leading to Remote Code Execution (RCE) and Supply Chain Compromise
 
 ## 1. Software/Product containing the vulnerability
 Medi Guide Bot [V1.0](https://github.com/GDbateaux/305.2-applied-cybersecurity/releases/tag/1.0.0)

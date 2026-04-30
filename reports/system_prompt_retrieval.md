@@ -69,4 +69,4 @@ Attackers can use the extracted system prompt to implement prompt injection atta
 This vulnerability was discovered through testing of the Medi Guide Bot ([V1.0](https://github.com/GDbateaux/305.2-applied-cybersecurity/releases/tag/1.0.0)). The findings confirm that prompt extraction is possible in both contexts, indicating a fundamental weakness in the application.
 
 ## 7. When did we find the vulnerability?
-This vulnerability was discovered on April 21, 2026.
+This vulnerability was discovered on April 20, 2026.
