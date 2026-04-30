@@ -302,10 +302,16 @@
         }
 
         /* Tables */
+        .table-wrapper {
+            overflow-x: auto;
+            margin: 30px 0;
+            border-radius: 12px;
+            border: 1px solid var(--border-glow);
+        }
+
         table {
             width: 100%;
             border-collapse: collapse;
-            margin: 30px 0;
             border-radius: 12px;
             overflow: hidden;
             border: 1px solid var(--border-glow);
@@ -417,13 +423,136 @@
 
         @media (max-width: 768px) {
             .glitch-title {
-                font-size: 2.2rem;
+                font-size: 2rem;
+                margin-bottom: 40px;
             }
             h2 {
-                font-size: 1.8rem;
+                font-size: 1.6rem;
+            }
+            h3 {
+                font-size: 1.4rem;
+            }
+            h4 {
+                font-size: 1.2rem;
             }
             section {
+                padding: 20px;
+                margin-bottom: 60px;
+            }
+            p {
+                font-size: 1rem;
+            }
+            .table-wrapper {
+                margin: 20px 0;
+                border-radius: 8px;
+            }
+            pre {
+                padding: 15px;
+                margin: 20px 0;
+            }
+            code {
+                font-size: 0.85rem;
+            }
+            ul, ol {
+                padding-left: 25px;
+            }
+            img, video {
+                margin: 20px auto;
+            }
+            blockquote {
+                padding: 15px;
+            }
+            .author-footer {
                 padding: 25px;
+                margin-top: 60px;
+            }
+            #scrollTopBtn {
+                bottom: 20px;
+                right: 20px;
+                width: 45px;
+                height: 45px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .glitch-title {
+                font-size: 1.5rem;
+                margin-bottom: 30px;
+            }
+            h2 {
+                font-size: 1.3rem;
+                margin-bottom: 20px;
+                padding-bottom: 10px;
+            }
+            h3 {
+                font-size: 1.2rem;
+                margin-top: 30px;
+            }
+            h4 {
+                font-size: 1.1rem;
+                padding-left: 10px;
+            }
+            h5 {
+                font-size: 1rem;
+            }
+            section {
+                padding: 15px;
+                margin-bottom: 40px;
+                border-radius: 12px;
+            }
+            p {
+                font-size: 0.95rem;
+                margin-bottom: 20px;
+            }
+            pre {
+                padding: 12px;
+                border-radius: 8px;
+            }
+            code {
+                font-size: 0.8rem;
+            }
+            .table-wrapper {
+                margin: 15px 0;
+                border-radius: 8px;
+            }
+            table {
+                font-size: 0.85rem;
+            }
+            th, td {
+                padding: 12px;
+            }
+            ul, ol {
+                padding-left: 20px;
+                margin: 20px 0;
+            }
+            li {
+                margin-bottom: 8px;
+            }
+            img, video {
+                border-radius: 8px;
+                margin: 15px auto;
+            }
+            blockquote {
+                padding: 12px;
+                margin: 20px 0;
+                border-radius: 6px;
+            }
+            hr {
+                margin: 40px 0;
+            }
+            .author-footer {
+                padding: 20px;
+                margin-top: 40px;
+                border-radius: 12px;
+            }
+            .author-footer p {
+                font-size: 0.95rem;
+            }
+            #scrollTopBtn {
+                bottom: 15px;
+                right: 15px;
+                width: 40px;
+                height: 40px;
             }
         }
 
@@ -528,6 +657,7 @@
             <h3>1.2 LLM Tool Integration</h3>
             <p>The LLM operates with a suite of role-scoped tools:</p>
 
+            <div class="table-wrapper">
             <table>
                 <thead>
                     <tr>
@@ -579,6 +709,7 @@
                     </tr>
                 </tbody>
             </table>
+            </div>
 
             <p>These tools are bound to an algorithmic RBAC layer intended to prevent unauthorized access regardless of LLM behavior.</p>
         </section>
