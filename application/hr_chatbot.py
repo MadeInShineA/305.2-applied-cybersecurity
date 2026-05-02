@@ -8,26 +8,28 @@ to review candidate matches, verify processing status, and send communications
 directly through the system.
 """
 
+import re
+
+import bcrypt
 import chainlit as cl
+from docling.document_converter import DocumentConverter
+from langchain_classic.agents import AgentExecutor, create_react_agent
+from langchain_classic.memory import ConversationBufferMemory
+from langchain_core.prompts import PromptTemplate
 from langchain_core.tools import tool
 from langchain_openai import ChatOpenAI
-from langchain_classic.agents import AgentExecutor, create_react_agent
-from langchain_core.prompts import PromptTemplate
-from docling.document_converter import DocumentConverter
-from langchain_classic.memory import ConversationBufferMemory
-import bcrypt
-import re
+
+from src.application_matcher import ApplicationMatcher
 
 # Import all custom modules
 from src.config import load_config
-from src.database import Database
-from src.mail_client import MailClient
-from src.email_classifier import EmailClassifier
 from src.cv_extractor import CvExtractor
 from src.cv_veracity_checker import CvVeracityChecker
-from src.application_matcher import ApplicationMatcher
+from src.database import Database
 from src.email_answer_generator import EmailAnswerGenerator
+from src.email_classifier import EmailClassifier
 from src.k_drive_tools import KDriveTools
+from src.mail_client import MailClient
 
 # ------------------------------------------------------------------------
 # 1. Initialization and Configuration
@@ -47,7 +49,7 @@ document_converter = DocumentConverter()
 cv_extractor = CvExtractor(config, document_converter)
 cv_veracity_checker = CvVeracityChecker(config)
 application_matcher = ApplicationMatcher(config, kdrive_tools)
-email_answer_generator = EmailAnswerGenerator(config)
+email_answer_generator = EmailAnswerGenerator(config, kdrive_tools)
 
 # Ensure database tables exist
 db.connect()
