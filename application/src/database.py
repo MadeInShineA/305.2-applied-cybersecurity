@@ -8,7 +8,7 @@ It uses PyMySQL to connect to a MySQL database and provides methods for
 creating, reading, and updating data across multiple tables.
 """
 
-from typing import Optional, List, Dict, Any
+from typing import Any, Dict, List, Optional
 
 import pymysql
 from pymysql.cursors import DictCursor
@@ -161,7 +161,7 @@ class Database:
                 CREATE TABLE IF NOT EXISTS hr_responses (
                     id INT AUTO_INCREMENT PRIMARY KEY,
                     match_id INT NOT NULL,
-                    hr_email_sent BOOLEAN DEFAULT FALSE,
+                    hr_email_sent BOOLEAN DEFAULT TRUE,
                     sent_at TIMESTAMP NULL,
                     candidate_email VARCHAR(255),
                     offer_name VARCHAR(500),
@@ -402,7 +402,7 @@ class Database:
         with self._connection.cursor() as cursor:
             cursor.execute(
                 """
-                SELECT 
+                SELECT
                     e.subject,
                     e.received_at,
                     e.body,
@@ -448,8 +448,8 @@ class Database:
         with self._connection.cursor() as cursor:
             cursor.execute(
                 """
-                SELECT hr_email_sent 
-                FROM hr_responses 
+                SELECT hr_email_sent
+                FROM hr_responses
                 WHERE match_id = %s AND hr_email_sent = TRUE
             """,
                 (match_id,),
