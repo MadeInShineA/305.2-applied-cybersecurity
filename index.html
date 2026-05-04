@@ -390,25 +390,36 @@
             margin: 60px 0;
         }
 
-        /* Author Footer */
-        .author-footer {
-            margin-top: 80px;
-            padding: 40px;
-            background: var(--bg-card);
-            border-radius: 16px;
-            border: 1px solid var(--neon-purple);
-            box-shadow: 0 0 30px rgba(157, 78, 221, 0.1);
+        /* Author Header */
+        .article-meta {
             text-align: center;
+            margin-bottom: 60px;
+            padding: 25px 40px;
+            background: var(--bg-card);
+            border-radius: 12px;
+            border: 1px solid var(--border-glow);
+            box-shadow: 0 0 20px rgba(0, 240, 255, 0.08);
         }
 
-        .author-footer p {
+        .article-meta p {
             color: var(--text-muted);
-            font-size: 1.1rem;
-            margin-bottom: 10px;
+            font-size: 1rem;
+            margin-bottom: 8px;
         }
 
-        .author-footer strong {
+        .article-meta p:last-child {
+            margin-bottom: 0;
+        }
+
+        .article-meta strong {
             color: var(--neon-purple);
+            font-weight: 600;
+        }
+
+        .article-meta .authors {
+            font-size: 1.15rem;
+            color: var(--text-light);
+            margin-bottom: 6px;
         }
 
         /* Responsive */
@@ -625,6 +636,12 @@
         <h1 class="glitch-title" data-aos="fade-down" data-text="The Silent Hijack: How a Simple Rename Compromised an Entire Healthcare System">
             The Silent Hijack: How a Simple Rename Compromised an Entire Healthcare System
         </h1>
+
+        <!-- Article Meta -->
+        <div class="article-meta" data-aos="fade-up">
+            <p class="authors"><strong>Authors</strong>: Olivier Amacker, Loic Christen</p>
+            <p><strong>Published</strong>: 4th of May 2026</p>
+        </div>
 
         <!-- Introduction -->
         <section id="introduction" data-aos="fade-up">
@@ -882,11 +899,7 @@ class DavClient:
 
         <hr>
 
-        <!-- Author Footer -->
-        <div class="author-footer" data-aos="fade-up">
-            <p><strong>Authors</strong>: Olivier Amacker, Loic Christen</p>
-            <p><strong>Date of publication</strong>: 30th of April 2026</p>
-        </div>
+
     </div>
 
     <!-- Scripts -->
