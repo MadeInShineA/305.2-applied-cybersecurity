@@ -20,10 +20,11 @@ Steps to Reproduce:
 
 Observation : The bot completely ignores its medical context and system instructions.
 
-<video controls width="640">
-  <source src="figs/bot_hijack.mp4" type="video/mp4">
-  Your browser does not support the video tag.
-</video>
+
+
+https://github.com/user-attachments/assets/5aff5425-9d35-4cee-8da7-9a4b807b969d
+
+
 
 note : the app that you can see in the video was made using streamlit to demonstrate that one can use the bot to have a free LLM-chat style app by connecting their telegram account to a python script.
 
